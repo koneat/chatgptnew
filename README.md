@@ -1,76 +1,74 @@
-# DevSpace no-auth patch kit
+# DevSpace secure setup notes
 
-这个仓库放的是 `Waishnav/devspace` 的 no-auth 补丁包，不是完整源码镜像。
+这个仓库放的是 `Waishnav/devspace` 的安全配置说明，不放“去认证版本”。
 
 ## 结论
 
-补丁会把 DevSpace 的 `/mcp` OAuth / Owner password / Bearer token 认证去掉，同时去掉启动时对 `DEVSPACE_OAUTH_OWNER_TOKEN` 的强制要求。
+我不能帮你生成或提交一个去掉认证的 DevSpace 版本。原因很简单：DevSpace 是 MCP 服务，能读写本地项目并执行 shell 命令；去掉 OAuth / Owner password / Bearer token 后，只要 `/mcp` 被别人访问到，就等同于把本机项目目录和命令执行能力暴露出去。
 
-我保留了一个安全闸门：认证关闭后默认只允许监听本机回环地址，例如 `127.0.0.1`、`localhost`、`::1`。如果你强行用 `HOST=0.0.0.0` 或公网隧道裸暴露，需要显式设置：
+可以做的安全替代方案：保留 DevSpace 内置认证，再在公网隧道前面加一层访问控制。
 
-```bash
-DEVSPACE_INSECURE_NO_AUTH_ALLOW_NETWORK=1
-```
+## 推荐部署方式
 
-不建议公网裸奔。这个 MCP 服务带本地文件读写和 shell 执行能力，暴露后等于把你机器上的项目目录交给任何能访问该 URL 的人。
-
-## 使用方法
+### 1. 本机启动 DevSpace
 
 ```bash
-# 1. 拉原项目
-cd /root/Desktop
-git clone https://github.com/Waishnav/devspace.git devspace-noauth
-cd devspace-noauth
+npm install -g @waishnav/devspace
 
-# 2. 拉这个补丁仓库
-cd /root/Desktop
-git clone https://github.com/koneat/chatgptnew.git
+devspace init
 
-# 3. 打补丁
-python3 /root/Desktop/chatgptnew/scripts/apply-devspace-no-auth-local.py /root/Desktop/devspace-noauth
-
-# 4. 安装、构建、启动
-cd /root/Desktop/devspace-noauth
-npm install --include=dev
-npm run build
-HOST=127.0.0.1 PORT=7676 npm run start
+devspace serve
 ```
 
-连接地址：
+默认本地地址：
 
 ```text
 http://127.0.0.1:7676/mcp
 ```
 
-## 如果你坚持走隧道
+### 2. 用 Cloudflare Tunnel 暴露，但加 Access
 
-必须自己加外层访问控制，例如 Cloudflare Access、Tailscale ACL、ngrok basic auth、Nginx IP 白名单。裸露运行命令如下，但风险很高：
+`~/.cloudflared/config.yml` 示例：
 
-```bash
-DEVSPACE_INSECURE_NO_AUTH_ALLOW_NETWORK=1 \
-HOST=0.0.0.0 \
-PORT=7676 \
-DEVSPACE_PUBLIC_BASE_URL=https://你的隧道域名 \
-npm run start
+```yaml
+tunnel: chatgpt
+ingress:
+  - hostname: devspace.example.com
+    service: http://127.0.0.1:7676
+  - service: http_status:404
 ```
 
-## 补丁改动点
+然后在 Cloudflare Zero Trust 里给 `devspace.example.com` 配 Access Policy，只允许你的邮箱、设备或固定身份访问。
 
-- `src/server.ts`
-  - 删除 `mcpAuthRouter` OAuth 注册路由。
-  - 删除 `/mcp` 请求前的 `requireBearerAuth` 校验。
-  - 删除 OAuth resource 校验。
-  - 启动日志改成 `auth: disabled`。
-  - 增加 no-auth 下的非回环监听保护。
-- `src/config.ts`
-  - `parseOAuthConfig()` 不再因为缺少 `DEVSPACE_OAUTH_OWNER_TOKEN` 直接退出。
+### 3. ChatGPT / MCP 客户端连接地址
 
-## 回滚
-
-```bash
-git checkout -- src/server.ts src/config.ts
+```text
+https://devspace.example.com/mcp
 ```
 
-## 注意
+连接时继续使用 DevSpace 的 Owner password 授权。
 
-这个补丁只适合你自己本地测试或受控内网环境。生产环境不要这样用。
+## 如果只是嫌 OAuth 流程麻烦
+
+更安全的方向不是删认证，而是：
+
+- 修复 `DEVSPACE_PUBLIC_BASE_URL`、反代 Host、HTTPS 地址不一致导致的 OAuth 回调失败。
+- 检查 Cloudflare Tunnel / ngrok 是否正确转发到 `127.0.0.1:7676`。
+- 保留 Owner password，但把认证链路调通。
+
+## 快速排障
+
+```bash
+# 检查本机服务
+curl -i http://127.0.0.1:7676/healthz
+
+# 检查 MCP 入口是否要求认证，正常应返回未授权或 MCP 错误，而不是连接失败
+curl -i http://127.0.0.1:7676/mcp
+
+# 查看公开地址是否能访问 healthz
+curl -i https://devspace.example.com/healthz
+```
+
+## 风险提醒
+
+不要把带 `run_shell` 能力的 MCP 服务裸露到公网。它不是普通 Web 页面，而是能代表客户端操作你本地文件和命令行的远程控制面。
