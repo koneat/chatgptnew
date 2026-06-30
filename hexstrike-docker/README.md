@@ -12,6 +12,7 @@
 - 增加 Docker 层 API Key 保护：设置 `HEXSTRIKE_API_KEY` 后，API 请求需要带 Key。
 - `hexstrike_mcp.py` 自动从环境变量读取 API Key，MCP 客户端不用手工改代码。
 - `.env` 集中管理 Shodan、Censys、VT、GitHub、FOFA、Hunter 等 Key。
+- 内置 ffuf 常用字典速查、自定义高价值字典和 `ffufx` 一键模板。
 - 提供 `docker compose`、`Makefile`、MCP 客户端配置示例。
 
 ## 文件结构
@@ -29,7 +30,15 @@ hexstrike-docker/
 │   └── patch_hexstrike.py
 ├── scripts/
 │   ├── run-mcp.sh
+│   ├── ffufx.sh
 │   └── healthcheck.sh
+├── wordlists/
+│   ├── ffuf-paths.md
+│   └── custom/
+│       ├── high-value-web.txt
+│       ├── high-value-params.txt
+│       ├── backup-ext.txt
+│       └── api-sensitive.txt
 └── config/
     └── claude_desktop_config.example.json
 ```
@@ -82,6 +91,82 @@ make shell             # 进入容器
 ./scripts/run-mcp.sh   # 以 stdio 方式启动 MCP 客户端
 make health            # 健康检查
 make down              # 停止
+```
+
+## ffuf 快速用法
+
+进入容器：
+
+```bash
+docker exec -it hexstrike-ai bash
+```
+
+目录扫描：
+
+```bash
+ffufx dir https://example.com/FUZZ
+```
+
+文件扫描：
+
+```bash
+ffufx file https://example.com/FUZZ
+```
+
+带扩展名：
+
+```bash
+EXT=php,js,json,map,bak,zip ffufx file https://example.com/FUZZ
+```
+
+参数发现：
+
+```bash
+ffufx param 'https://example.com/api/user?FUZZ=1'
+```
+
+API / Swagger / SourceMap / 配置路径：
+
+```bash
+ffufx api https://example.com/FUZZ
+```
+
+虚拟主机 Host 头探测：
+
+```bash
+ffufx vhost https://1.2.3.4/ example.com
+```
+
+控制速率和线程：
+
+```bash
+RATE=20 THREADS=10 ffufx dir https://example.com/FUZZ
+```
+
+自定义字典：
+
+```bash
+WORDLIST=/usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt \
+  ffufx dir https://example.com/FUZZ
+```
+
+结果默认写到：
+
+```text
+/reports/ffuf-模式-时间.json
+```
+
+更多字典路径看：
+
+```text
+wordlists/ffuf-paths.md
+```
+
+容器内也会复制到：
+
+```text
+/opt/hexstrike-docker-wordlists
+/workspace/wordlists/hexstrike-custom
 ```
 
 ## MCP 客户端接入
@@ -138,7 +223,7 @@ HUNTER_API_KEY=
 `docker/install-tools.sh` 分三层：
 
 1. 必装基础包：Python、Git、curl、编译工具、Chromium、网络基础工具。
-2. Kali apt 安全工具：nmap、masscan、sqlmap、nuclei、gobuster、ffuf、dirsearch、nikto、hydra、john、metasploit、radare2、binwalk 等。单个工具不存在不会中断构建。
+2. Kali apt 安全工具：nmap、masscan、sqlmap、nuclei、gobuster、ffuf、dirsearch、nikto、hydra、john、metasploit、radare2、binwalk、wordlists、seclists 等。单个工具不存在不会中断构建。
 3. Go / Python CLI 补充：subfinder、httpx、katana、dnsx、naabu、gau、waybackurls、dalfox、arjun、uro、paramspider 等。失败只报警，不影响核心 API 启动。
 
 如果你只想快速构建，关闭补充安装：
