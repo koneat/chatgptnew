@@ -9,7 +9,7 @@ rest
 rpc
 jsonrpc
 graphql
-grapiql
+graphiql
 graphql/console
 graphql/playground
 swagger
