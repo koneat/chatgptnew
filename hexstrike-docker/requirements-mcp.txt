@@ -1,5 +1,2 @@
-# Physical-host MCP dependencies.
-# Use a venv. Do not install into system Python on Debian/Kali.
-
 requests
 mcp
