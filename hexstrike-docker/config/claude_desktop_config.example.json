@@ -1,11 +1,11 @@
 {
   "mcpServers": {
     "hexstrike-ai-docker": {
-      "command": "bash",
+      "command": "python3",
       "args": [
-        "/ABSOLUTE/PATH/hexstrike-docker/scripts/run-mcp.sh"
+        "/ABSOLUTE/PATH/hexstrike-docker/hexstrike_mcp.py"
       ],
-      "description": "HexStrike AI Docker MCP client",
+      "description": "HexStrike AI Docker MCP launcher",
       "timeout": 300,
       "disabled": false
     }
