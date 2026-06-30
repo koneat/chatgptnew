@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+!.env.example
+workspace
+reports
+data
+config
+__pycache__
+*.pyc
+*.pyo
+*.log
+.DS_Store
