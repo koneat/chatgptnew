@@ -10,15 +10,18 @@
 - 构建时自动拉取上游 `https://github.com/0x4m4/hexstrike-ai`。
 - 自动安装 Python 依赖、系统工具、Go 工具、Python CLI 工具。
 - 增加 Docker 层 API Key 保护：设置 `HEXSTRIKE_API_KEY` 后，API 请求需要带 Key。
-- `hexstrike_mcp.py` 自动从环境变量读取 API Key，MCP 客户端不用手工改代码。
+- 顶层提供 `hexstrike_mcp.py`，MCP 客户端可以直接配置这个文件。
+- `requirements-mcp.txt` 和 `scripts/install-mcp-pip.sh` 用于本机 MCP Python 环境。
 - `.env` 集中管理 Shodan、Censys、VT、GitHub、FOFA、Hunter 等 Key。
 - 内置 ffuf 常用字典速查、自定义高价值字典和 `ffufx` 一键模板。
-- 提供 `docker compose`、`Makefile`、MCP 客户端配置示例。
+- 提供 `docker compose`、`docker run`、`Makefile`、MCP 客户端配置示例。
 
 ## 文件结构
 
 ```text
 hexstrike-docker/
+├── hexstrike_mcp.py
+├── requirements-mcp.txt
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
@@ -29,6 +32,8 @@ hexstrike-docker/
 │   ├── install-tools.sh
 │   └── patch_hexstrike.py
 ├── scripts/
+│   ├── docker-run.sh
+│   ├── install-mcp-pip.sh
 │   ├── run-mcp.sh
 │   ├── ffufx.sh
 │   └── healthcheck.sh
@@ -45,11 +50,19 @@ hexstrike-docker/
 
 ## 快速启动
 
+如果你没有 `docker compose`，直接用最简单方案：
+
+```bash
+cd hexstrike-docker
+chmod +x scripts/docker-run.sh
+./scripts/docker-run.sh
+```
+
+如果你有 Compose：
+
 ```bash
 cd hexstrike-docker
 cp .env.example .env
-
-# 修改 API Key，至少改这个
 nano .env
 
 docker compose build
@@ -88,7 +101,7 @@ make build             # 构建镜像
 make up                # 后台启动
 make logs              # 看日志
 make shell             # 进入容器
-./scripts/run-mcp.sh   # 以 stdio 方式启动 MCP 客户端
+./hexstrike_mcp.py     # MCP 顶层启动器，默认转进 Docker 容器
 make health            # 健康检查
 make down              # 停止
 ```
@@ -176,19 +189,46 @@ HexStrike 上游是“两段式”：
 1. `hexstrike_server.py`：HTTP API 服务，默认 `8888`。
 2. `hexstrike_mcp.py`：stdio MCP 客户端，连接 HTTP API。
 
-Docker 版建议让 MCP 客户端通过 `scripts/run-mcp.sh` 进入容器执行：
+现在 `hexstrike-docker/hexstrike_mcp.py` 已经放在顶层，MCP 客户端直接配置它：
 
 ```json
 {
   "mcpServers": {
     "hexstrike-ai-docker": {
-      "command": "bash",
-      "args": ["/你的绝对路径/hexstrike-docker/scripts/run-mcp.sh"],
+      "command": "python3",
+      "args": ["/你的绝对路径/hexstrike-docker/hexstrike_mcp.py"],
       "timeout": 300,
       "disabled": false
     }
   }
 }
+```
+
+这个顶层 `hexstrike_mcp.py` 默认是 Docker 启动器：
+
+```text
+MCP 客户端 -> hexstrike-docker/hexstrike_mcp.py -> docker exec -> 容器内 /entrypoint.sh mcp -> 上游 hexstrike_mcp.py -> 8888 API
+```
+
+测试命令：
+
+```bash
+python3 hexstrike_mcp.py --print-command
+python3 hexstrike_mcp.py
+```
+
+如果你要本机 Python 跑上游 MCP 依赖：
+
+```bash
+chmod +x scripts/install-mcp-pip.sh
+./scripts/install-mcp-pip.sh
+.venv-mcp/bin/python hexstrike_mcp.py --print-command
+```
+
+对应 pip 文件：
+
+```text
+requirements-mcp.txt
 ```
 
 注意：这是 stdio MCP 方式。若你要把它接到需要 HTTP/SSE/Streamable HTTP 的平台，需要额外加 MCP 网关或反代桥接层。
@@ -202,7 +242,7 @@ HEXSTRIKE_API_KEY=change_me_to_a_long_random_value
 HEXSTRIKE_API_KEY_HEADER=X-HexStrike-Api-Key
 ```
 
-MCP 客户端同样读取这两个环境变量，不需要改 `hexstrike_mcp.py`。
+MCP 客户端同样读取这两个环境变量，不需要改容器里的上游 `hexstrike_mcp.py`。
 
 第三方平台 Key 都放 `.env`：
 
@@ -229,16 +269,15 @@ HUNTER_API_KEY=
 如果你只想快速构建，关闭补充安装：
 
 ```bash
-INSTALL_GO_TOOLS=false INSTALL_PY_TOOLS=false docker compose build
+INSTALL_GO_TOOLS=false INSTALL_PY_TOOLS=false docker build -t hexstrike-ai:docker .
 ```
 
 ## 端口和安全
 
-默认 compose：
+默认绑定：
 
-```yaml
-ports:
-  - "127.0.0.1:8888:8888"
+```text
+127.0.0.1:8888 -> 容器 8888
 ```
 
 这表示只允许本机访问。Cloudflare Tunnel / SSH Tunnel 可以继续转发本机端口，不建议直接改成 `0.0.0.0` 裸露公网。
@@ -246,7 +285,7 @@ ports:
 如果确实要监听所有网卡：
 
 ```bash
-HEXSTRIKE_BIND=0.0.0.0 docker compose up -d
+HEXSTRIKE_BIND=0.0.0.0 ./scripts/docker-run.sh
 ```
 
 必须同时设置强随机 `HEXSTRIKE_API_KEY`，并在公网前面加 Cloudflare Access / Basic Auth / VPN。
@@ -274,7 +313,8 @@ which nmap sqlmap nuclei subfinder httpx katana ffuf gobuster
 curl http://127.0.0.1:8888/health
 
 # 检查 MCP stdio 是否能启动
-./scripts/run-mcp.sh
+python3 hexstrike_mcp.py --print-command
+python3 hexstrike_mcp.py
 ```
 
 ## 重要风险点
