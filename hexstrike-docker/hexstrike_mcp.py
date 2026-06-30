@@ -10,8 +10,6 @@ client that lives inside the Docker container:
 
 Default flow:
   MCP client -> this launcher -> docker exec -> /entrypoint.sh mcp -> upstream hexstrike_mcp.py -> API :8888
-
-It keeps API keys in .env and passes them into the container process.
 """
 from __future__ import annotations
 
@@ -51,7 +49,6 @@ def merged_env() -> Dict[str, str]:
         env.setdefault(key, value)
     env.setdefault("HEXSTRIKE_PORT", "8888")
     env.setdefault("HEXSTRIKE_SERVER", f"http://127.0.0.1:{env.get('HEXSTRIKE_PORT', '8888')}")
-    env.setdefault("HEXSTRIKE_API_KEY_HEADER", "X-HexStrike-Api-Key")
     env.setdefault("HEXSTRIKE_CONTAINER_NAME", "hexstrike-ai")
     return env
 
@@ -81,14 +78,10 @@ def container_running(container_name: str, env: Dict[str, str]) -> bool:
 def build_docker_exec(env: Dict[str, str], extra_args: Iterable[str]) -> List[str]:
     container = env.get("HEXSTRIKE_CONTAINER_NAME", "hexstrike-ai")
     server = env.get("HEXSTRIKE_SERVER", f"http://127.0.0.1:{env.get('HEXSTRIKE_PORT', '8888')}")
-    api_key = env.get("HEXSTRIKE_API_KEY", "")
-    api_key_header = env.get("HEXSTRIKE_API_KEY_HEADER", "X-HexStrike-Api-Key")
 
     cmd = [
         "docker", "exec", "-i",
         "-e", f"HEXSTRIKE_SERVER={server}",
-        "-e", f"HEXSTRIKE_API_KEY={api_key}",
-        "-e", f"HEXSTRIKE_API_KEY_HEADER={api_key_header}",
         container,
         "/entrypoint.sh", "mcp",
     ]
