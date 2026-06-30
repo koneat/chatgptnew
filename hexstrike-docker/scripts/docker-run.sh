@@ -23,7 +23,8 @@ mkdir -p workspace reports data config
 
 build_args=()
 if grep -q '^INSTALL_EXTRA_TOOLS=false' .env 2>/dev/null; then
-  build_args+=(--build-arg INSTALL_EXTRA_TOOLS=false)
+  warn "INSTALL_EXTRA_TOOLS=false: skip supplemental Go/Python tools"
+  build_args+=(--build-arg INSTALL_GO_TOOLS=false --build-arg INSTALL_PY_TOOLS=false)
 fi
 
 log "building image: ${IMAGE_NAME}"
