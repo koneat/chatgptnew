@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""HexStrike MCP launcher.
+"""HexStrike physical-machine MCP launcher.
 
-Default flow for the packaged Docker setup:
-  MCP client -> this launcher -> docker exec -i hexstrike-ai /entrypoint.sh mcp
+Default flow:
+  MCP client -> this launcher on the physical host -> upstream HexStrike MCP on the physical host -> HexStrike API
 
-The HexStrike API server can run inside Docker while the MCP client starts this
-small launcher on the host. The launcher prefers the Docker MCP runtime because
-it already contains the upstream HexStrike MCP file and Python dependencies.
+Docker may still run the HexStrike API server, but MCP defaults to the physical
+host because that is the user's known-good setup. Docker MCP is only used when
+explicitly requested with --mode docker.
 """
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ def build_physical_exec(env: Dict[str, str], extra_args: Iterable[str]) -> List[
     mcp_path = Path(upstream_mcp).expanduser()
     if not mcp_path.exists():
         raise SystemExit(
-            "Physical MCP files are not installed. Use --mode docker, or install the upstream MCP files first."
+            "Physical MCP files are not installed. Run the physical MCP install commands from README, then start again."
         )
 
     server = env.get("HEXSTRIKE_SERVER", "http://127.0.0.1:8888")
@@ -103,25 +103,13 @@ def build_physical_exec(env: Dict[str, str], extra_args: Iterable[str]) -> List[
     return cmd
 
 
-def resolve_mode(requested_mode: str, env: Dict[str, str]) -> str:
-    if requested_mode != "auto":
-        return requested_mode
-
-    container = env.get("HEXSTRIKE_CONTAINER_NAME", "hexstrike-ai")
-    if container_running(container, env):
-        return "docker"
-    if DEFAULT_UPSTREAM_MCP.exists():
-        return "physical"
-    return "docker"
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="HexStrike MCP launcher")
     parser.add_argument(
         "--mode",
-        choices=("auto", "docker", "physical", "local"),
-        default=os.environ.get("HEXSTRIKE_MCP_MODE", "auto"),
-        help="auto prefers Docker when the hexstrike-ai container is running",
+        choices=("physical", "local", "docker"),
+        default=os.environ.get("HEXSTRIKE_MCP_MODE", "physical"),
+        help="physical/local runs MCP on this host; docker runs MCP inside the container",
     )
     parser.add_argument("--server", default=None, help="Host-side HexStrike API URL for physical mode")
     parser.add_argument("--container", default=None, help="Docker container name, default hexstrike-ai")
@@ -134,9 +122,7 @@ def main() -> int:
     if args.container:
         env["HEXSTRIKE_CONTAINER_NAME"] = args.container
 
-    mode = resolve_mode(args.mode, env)
-
-    if mode == "docker":
+    if args.mode == "docker":
         if not docker_available():
             print("[hexstrike_mcp] docker command not found", file=sys.stderr)
             return 127
