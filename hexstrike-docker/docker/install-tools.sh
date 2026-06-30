@@ -16,9 +16,9 @@ apt_update() {
 apt_install_required() {
   log "Installing required base packages"
   apt-get install -y --no-install-recommends \
-    ca-certificates curl wget git jq unzip zip tar gzip xz-utils \
-    bash-completion procps psmisc lsof file less nano vim \
-    iproute2 iputils-ping net-tools dnsutils netcat-traditional whois \
+    ca-certificates curl wget git jq unzip zip tar gzip xz-utils rsync \
+    bash-completion procps psmisc lsof file less nano vim tmux screen \
+    iproute2 iputils-ping net-tools dnsutils netcat-traditional socat whois \
     python3 python3-pip python3-venv python3-dev pipx \
     build-essential gcc g++ make cmake pkg-config \
     libffi-dev libssl-dev libxml2-dev libxslt1-dev zlib1g-dev \
@@ -38,14 +38,37 @@ apt_install_optional_one() {
 }
 
 apt_install_optional() {
+  if [ "${INSTALL_EXTRA_TOOLS:-true}" = "false" ]; then
+    warn "INSTALL_EXTRA_TOOLS=false, skipping optional apt tools"
+    return 0
+  fi
+
   log "Installing optional Kali security tools. Missing packages will be skipped."
   local packages=(
-    nmap masscan rustscan arp-scan nbtscan dnsenum fierce amass subfinder nuclei
+    # network / discovery
+    nmap masscan rustscan arp-scan nbtscan dnsenum dnsrecon fierce amass subfinder nuclei
+    naabu httpx-toolkit tlsx dnsx
+
+    # web discovery / fuzzing
     gobuster feroxbuster ffuf dirb dirsearch nikto sqlmap wpscan arjun whatweb wafw00f
-    sslscan testssl.sh hydra john hashcat medusa patator netexec enum4linux-ng smbmap responder
-    theharvester recon-ng exiftool binwalk foremost steghide sleuthkit testdisk radare2 gdb gdbserver
-    checksec ropgadget metasploit-framework exploitdb zaproxy wfuzz commix nosqlmap wordlists seclists
-    trivy checkov terrascan kube-hunter kube-bench yersinia bettercap
+    sslscan testssl.sh wfuzz commix dalfox
+
+    # auth / service audit helpers
+    hydra john hashcat medusa patator netexec enum4linux-ng smbmap responder evil-winrm
+    snmpcheck onesixtyone ldap-utils redis-tools postgresql-client mysql-client
+
+    # osint / recon / archives
+    theharvester recon-ng exploitdb seclists wordlists
+
+    # file / forensics / reversing / binary
+    exiftool binwalk foremost steghide sleuthkit testdisk volatility3 radare2 gdb gdbserver
+    checksec ropgadget ropper nasm strace ltrace
+
+    # platform / cloud / container
+    trivy checkov kube-hunter kube-bench
+
+    # proxy / browser / misc
+    zaproxy yersinia bettercap mitmproxy tcpdump tshark wireshark-common
   )
 
   for pkg in "${packages[@]}"; do
@@ -69,8 +92,8 @@ go_install_one() {
 }
 
 install_go_tools() {
-  if [ "${INSTALL_GO_TOOLS:-true}" != "true" ]; then
-    warn "INSTALL_GO_TOOLS=false, skipping Go tools"
+  if [ "${INSTALL_GO_TOOLS:-true}" != "true" ] || [ "${INSTALL_EXTRA_TOOLS:-true}" = "false" ]; then
+    warn "skipping Go tools"
     return 0
   fi
 
@@ -86,6 +109,9 @@ install_go_tools() {
   go_install_one tlsx github.com/projectdiscovery/tlsx/cmd/tlsx@latest
   go_install_one mapcidr github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest
   go_install_one shuffledns github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest
+  go_install_one notify github.com/projectdiscovery/notify/cmd/notify@latest
+  go_install_one uncover github.com/projectdiscovery/uncover/cmd/uncover@latest
+
   go_install_one ffuf github.com/ffuf/ffuf/v2@latest
   go_install_one gobuster github.com/OJ/gobuster/v3@latest
   go_install_one gau github.com/lc/gau/v2/cmd/gau@latest
@@ -94,7 +120,8 @@ install_go_tools() {
   go_install_one qsreplace github.com/tomnomnom/qsreplace@latest
   go_install_one hakrawler github.com/hakluke/hakrawler@latest
   go_install_one dalfox github.com/hahwul/dalfox/v2@latest
-  go_install_one jaeles github.com/jaeles-project/jaeles@latest
+  go_install_one gospider github.com/jaeles-project/gospider@latest
+  go_install_one assetfinder github.com/tomnomnom/assetfinder@latest
 }
 
 pipx_install_one() {
@@ -163,8 +190,8 @@ EOF
 }
 
 install_python_cli_tools() {
-  if [ "${INSTALL_PY_TOOLS:-true}" != "true" ]; then
-    warn "INSTALL_PY_TOOLS=false, skipping Python CLI tools"
+  if [ "${INSTALL_PY_TOOLS:-true}" != "true" ] || [ "${INSTALL_EXTRA_TOOLS:-true}" = "false" ]; then
+    warn "skipping Python CLI tools"
     return 0
   fi
 
@@ -177,7 +204,25 @@ install_python_cli_tools() {
   pipx_install_one censys censys
   pipx_install_one trufflehog trufflehog
   pipx_install_one socialscan socialscan
+  pipx_install_one wafw00f wafw00f
+  pipx_install_one dirsearch dirsearch
   install_paramspider_from_git
+}
+
+install_dictionary_helpers() {
+  log "Preparing common dictionary paths"
+  mkdir -p /workspace/wordlists /reports /data
+
+  if [ -d /usr/share/seclists ]; then
+    ln -sfn /usr/share/seclists /workspace/wordlists/seclists
+  fi
+  if [ -d /usr/share/wordlists ]; then
+    ln -sfn /usr/share/wordlists /workspace/wordlists/system
+  fi
+
+  if [ -f /usr/share/wordlists/rockyou.txt.gz ] && [ ! -f /usr/share/wordlists/rockyou.txt ]; then
+    gzip -dk /usr/share/wordlists/rockyou.txt.gz || true
+  fi
 }
 
 cleanup() {
@@ -192,6 +237,7 @@ apt_install_required
 apt_install_optional
 install_go_tools
 install_python_cli_tools
+install_dictionary_helpers
 cleanup
 
 log "Tool installation finished"
