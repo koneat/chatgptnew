@@ -97,6 +97,71 @@ install_go_tools() {
   go_install_one jaeles github.com/jaeles-project/jaeles@latest
 }
 
+pipx_install_one() {
+  local name="$1"
+  local spec="$2"
+  if command -v "$name" >/dev/null 2>&1; then
+    echo "[OK] python cli already exists: $name"
+    return 0
+  fi
+  log "pipx install $name"
+  if timeout 600 pipx install "$spec"; then
+    echo "[OK] python cli: $name"
+  else
+    warn "python cli skipped: $name"
+  fi
+}
+
+install_paramspider_from_git() {
+  if command -v paramspider >/dev/null 2>&1; then
+    echo "[OK] python cli already exists: paramspider"
+    return 0
+  fi
+
+  log "Installing ParamSpider from GitHub"
+  if timeout 600 pipx install 'git+https://github.com/devanshbatham/ParamSpider.git'; then
+    echo "[OK] python cli: paramspider"
+    return 0
+  fi
+
+  warn "ParamSpider pipx install failed; installing fallback wrapper"
+  cat > /usr/local/bin/paramspider <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ $# -lt 1 ]; then
+  echo "Usage: paramspider -d example.com | paramspider example.com" >&2
+  exit 2
+fi
+DOMAIN=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -d|--domain)
+      DOMAIN="${2:-}"
+      shift 2
+      ;;
+    *)
+      if [ -z "${DOMAIN}" ]; then DOMAIN="$1"; fi
+      shift
+      ;;
+  esac
+done
+if [ -z "${DOMAIN}" ]; then
+  echo "Missing domain" >&2
+  exit 2
+fi
+if command -v waybackurls >/dev/null 2>&1; then
+  waybackurls "${DOMAIN}" | grep '=' | sort -u
+elif command -v gau >/dev/null 2>&1; then
+  gau "${DOMAIN}" | grep '=' | sort -u
+else
+  echo "Neither waybackurls nor gau is installed" >&2
+  exit 1
+fi
+EOF
+  chmod +x /usr/local/bin/paramspider
+  echo "[OK] fallback paramspider wrapper installed"
+}
+
 install_python_cli_tools() {
   if [ "${INSTALL_PY_TOOLS:-true}" != "true" ]; then
     warn "INSTALL_PY_TOOLS=false, skipping Python CLI tools"
@@ -106,27 +171,13 @@ install_python_cli_tools() {
   log "Installing supplemental Python CLI tools via pipx"
   python3 -m pipx ensurepath || true
 
-  local tools=(
-    arjun
-    uro
-    shodan
-    censys
-    trufflehog
-    socialscan
-    paramspider
-  )
-
-  for tool in "${tools[@]}"; do
-    if command -v "$tool" >/dev/null 2>&1; then
-      echo "[OK] python cli already exists: $tool"
-      continue
-    fi
-    if timeout 600 pipx install "$tool"; then
-      echo "[OK] python cli: $tool"
-    else
-      warn "python cli skipped: $tool"
-    fi
-  done
+  pipx_install_one arjun arjun
+  pipx_install_one uro uro
+  pipx_install_one shodan shodan
+  pipx_install_one censys censys
+  pipx_install_one trufflehog trufflehog
+  pipx_install_one socialscan socialscan
+  install_paramspider_from_git
 }
 
 cleanup() {
