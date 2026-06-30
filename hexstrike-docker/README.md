@@ -74,14 +74,14 @@ HEXSTRIKE_API_KEY_ALLOW_HEALTH=false
 ## 常用命令
 
 ```bash
-make init      # 复制 .env.example 到 .env
-make build     # 构建镜像
-make up        # 后台启动
-make logs      # 看日志
-make shell     # 进入容器
-make mcp       # 以 stdio 方式启动 MCP 客户端
-make health    # 健康检查
-make down      # 停止
+make init              # 复制 .env.example 到 .env，并创建目录
+make build             # 构建镜像
+make up                # 后台启动
+make logs              # 看日志
+make shell             # 进入容器
+./scripts/run-mcp.sh   # 以 stdio 方式启动 MCP 客户端
+make health            # 健康检查
+make down              # 停止
 ```
 
 ## MCP 客户端接入
