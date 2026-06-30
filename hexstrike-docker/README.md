@@ -10,8 +10,7 @@
 - 构建时自动拉取上游 `https://github.com/0x4m4/hexstrike-ai`。
 - 自动安装 Python 依赖、系统工具、Go 工具、Python CLI 工具。
 - 不启用 Docker 层 API Key，保持本地使用简单。
-- 顶层提供 `hexstrike_mcp.py`，MCP 客户端可以直接配置这个文件。
-- `requirements-mcp.txt` 和 `scripts/install-mcp-pip.sh` 用于本机 MCP Python 环境。
+- 顶层提供 `hexstrike_mcp.py`，默认在物理机运行 MCP，连接 `127.0.0.1:8888` API。
 - `.env` 集中管理 Shodan、Censys、VT、GitHub、FOFA、Hunter 等第三方 Key。
 - 内置 ffuf 常用字典速查、自定义高价值字典和 `ffufx` 一键模板。
 - 提供 `docker compose`、`docker run`、`Makefile`、MCP 客户端配置示例。
@@ -48,7 +47,7 @@ hexstrike-docker/
     └── claude_desktop_config.example.json
 ```
 
-## 快速启动
+## 快速启动 API
 
 如果你没有 `docker compose`，直接用最简单方案：
 
@@ -83,6 +82,50 @@ curl -H "Content-Type: application/json" \
   http://127.0.0.1:8888/api/tools/nmap
 ```
 
+## 物理机 MCP 安装命令
+
+不要直接用系统 pip；Debian / Kali 会触发 PEP 668。按下面命令建 venv。
+
+```bash
+cd chatgptnew/hexstrike-docker
+
+apt-get update
+apt-get install -y python3-venv python3-full git
+
+mkdir -p upstream
+
+if [ ! -d upstream/hexstrike-ai/.git ]; then
+  git clone --depth 1 --branch master https://github.com/0x4m4/hexstrike-ai.git upstream/hexstrike-ai
+else
+  git -C upstream/hexstrike-ai fetch --depth 1 origin master
+  git -C upstream/hexstrike-ai checkout -f FETCH_HEAD
+fi
+
+python3 -m venv .venv-mcp
+.venv-mcp/bin/python -m pip install --upgrade pip setuptools wheel
+.venv-mcp/bin/pip install -r requirements-mcp.txt
+
+.venv-mcp/bin/python - <<'PY'
+import requests
+from mcp.server.fastmcp import FastMCP
+print('[OK] physical MCP dependencies are ready')
+PY
+```
+
+启动物理机 MCP：
+
+```bash
+cd chatgptnew/hexstrike-docker
+.venv-mcp/bin/python hexstrike_mcp.py --print-command
+.venv-mcp/bin/python hexstrike_mcp.py
+```
+
+默认链路：
+
+```text
+MCP 客户端 -> 物理机 .venv-mcp/bin/python -> hexstrike_mcp.py -> upstream/hexstrike-ai/hexstrike_mcp.py -> http://127.0.0.1:8888
+```
+
 ## 常用命令
 
 ```bash
@@ -91,12 +134,12 @@ make build             # 构建镜像
 make up                # 后台启动
 make logs              # 看日志
 make shell             # 进入容器
-./hexstrike_mcp.py     # MCP 顶层启动器，默认转进 Docker 容器
+.venv-mcp/bin/python hexstrike_mcp.py  # 物理机 MCP
 make health            # 健康检查
 make down              # 停止
 ```
 
-不用 Compose 的一条龙重装：
+不用 Compose 的一条龙重装 API：
 
 ```bash
 docker rm -f hexstrike-ai 2>/dev/null || true
@@ -180,21 +223,16 @@ wordlists/ffuf-paths.md
 /workspace/wordlists/hexstrike-custom
 ```
 
-## MCP 客户端接入
+## MCP 客户端配置
 
-HexStrike 上游是“两段式”：
-
-1. `hexstrike_server.py`：HTTP API 服务，默认 `8888`。
-2. `hexstrike_mcp.py`：stdio MCP 客户端，连接 HTTP API。
-
-现在 `hexstrike-docker/hexstrike_mcp.py` 已经放在顶层，MCP 客户端直接配置它：
+把 `/ABSOLUTE/PATH` 换成你的真实路径：
 
 ```json
 {
   "mcpServers": {
-    "hexstrike-ai-docker": {
-      "command": "python3",
-      "args": ["/你的绝对路径/hexstrike-docker/hexstrike_mcp.py"],
+    "hexstrike-ai-physical": {
+      "command": "/ABSOLUTE/PATH/hexstrike-docker/.venv-mcp/bin/python",
+      "args": ["/ABSOLUTE/PATH/hexstrike-docker/hexstrike_mcp.py"],
       "timeout": 300,
       "disabled": false
     }
@@ -202,31 +240,19 @@ HexStrike 上游是“两段式”：
 }
 ```
 
-这个顶层 `hexstrike_mcp.py` 默认是 Docker 启动器：
+如果你的路径是 `/root/chatgptnew/hexstrike-docker`：
 
-```text
-MCP 客户端 -> hexstrike-docker/hexstrike_mcp.py -> docker exec -> 容器内 /entrypoint.sh mcp -> 上游 hexstrike_mcp.py -> 8888 API
-```
-
-测试命令：
-
-```bash
-python3 hexstrike_mcp.py --print-command
-python3 hexstrike_mcp.py
-```
-
-如果你要本机 Python 跑上游 MCP 依赖：
-
-```bash
-chmod +x scripts/install-mcp-pip.sh
-./scripts/install-mcp-pip.sh
-.venv-mcp/bin/python hexstrike_mcp.py --print-command
-```
-
-对应 pip 文件：
-
-```text
-requirements-mcp.txt
+```json
+{
+  "mcpServers": {
+    "hexstrike-ai-physical": {
+      "command": "/root/chatgptnew/hexstrike-docker/.venv-mcp/bin/python",
+      "args": ["/root/chatgptnew/hexstrike-docker/hexstrike_mcp.py"],
+      "timeout": 300,
+      "disabled": false
+    }
+  }
+}
 ```
 
 注意：这是 stdio MCP 方式。若你要把它接到需要 HTTP/SSE/Streamable HTTP 的平台，需要额外加 MCP 网关或反代桥接层。
@@ -302,8 +328,8 @@ which nmap sqlmap nuclei subfinder httpx katana ffuf gobuster
 curl http://127.0.0.1:8888/health
 
 # 检查 MCP stdio 是否能启动
-python3 hexstrike_mcp.py --print-command
-python3 hexstrike_mcp.py
+.venv-mcp/bin/python hexstrike_mcp.py --print-command
+.venv-mcp/bin/python hexstrike_mcp.py
 ```
 
 ## 重要风险点
