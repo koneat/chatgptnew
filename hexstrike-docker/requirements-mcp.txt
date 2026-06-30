@@ -1,9 +1,14 @@
-# Minimal dependencies for running an upstream HexStrike MCP client locally.
+# Optional local MCP dependencies.
+#
+# IMPORTANT:
 # The default hexstrike-docker/hexstrike_mcp.py launcher uses only Python stdlib
-# when running in docker mode. These packages are for local/upstream MCP mode.
+# in docker mode. You do NOT need this file for normal Docker MCP usage.
+#
+# Install only if you want to run an upstream/local HexStrike MCP client outside
+# the container. Version pins are intentionally loose to avoid resolver conflicts
+# across Python 3.10 / 3.11 / 3.12 / 3.13.
 
-requests>=2.31.0,<3.0.0
-fastmcp>=0.2.0,<1.0.0
-mcp>=1.0.0,<2.0.0
-python-dotenv>=1.0.0,<2.0.0
-pydantic>=2.0.0,<3.0.0
+requests
+fastmcp
+python-dotenv
+pydantic
