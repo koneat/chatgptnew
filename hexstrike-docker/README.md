@@ -1,18 +1,18 @@
 # HexStrike Docker
 
-基于上游 `0x4m4/hexstrike-ai` 的 Docker 化部署版本。目标是：一条命令启动 HexStrike API，工具尽量装全，API Key / 第三方平台 Key 统一走 `.env`，方便接 Claude / Cursor / 本地 MCP 客户端。
+基于上游 `0x4m4/hexstrike-ai` 的 Docker 化部署版本。目标是：一条命令启动 HexStrike API，工具尽量装全，第三方平台 Key 统一走 `.env`，方便接 Claude / Cursor / 本地 MCP 客户端。
 
-> 仅用于合法授权测试环境。不要把容器的 API 服务裸露到公网；默认 compose 只绑定 `127.0.0.1`。
+> 仅用于合法授权测试环境。默认只绑定 `127.0.0.1`。本版本不内置 API Key 校验，不要把 8888 端口裸露到公网。
 
 ## 已做的增强
 
 - 使用 `kalilinux/kali-rolling` 作为基础镜像，优先兼容安全工具生态。
 - 构建时自动拉取上游 `https://github.com/0x4m4/hexstrike-ai`。
 - 自动安装 Python 依赖、系统工具、Go 工具、Python CLI 工具。
-- 增加 Docker 层 API Key 保护：设置 `HEXSTRIKE_API_KEY` 后，API 请求需要带 Key。
+- 不启用 Docker 层 API Key，保持本地使用简单。
 - 顶层提供 `hexstrike_mcp.py`，MCP 客户端可以直接配置这个文件。
 - `requirements-mcp.txt` 和 `scripts/install-mcp-pip.sh` 用于本机 MCP Python 环境。
-- `.env` 集中管理 Shodan、Censys、VT、GitHub、FOFA、Hunter 等 Key。
+- `.env` 集中管理 Shodan、Censys、VT、GitHub、FOFA、Hunter 等第三方 Key。
 - 内置 ffuf 常用字典速查、自定义高价值字典和 `ffufx` 一键模板。
 - 提供 `docker compose`、`docker run`、`Makefile`、MCP 客户端配置示例。
 
@@ -75,22 +75,12 @@ docker compose up -d
 curl http://127.0.0.1:8888/health
 ```
 
-如果 `.env` 里启用了 `HEXSTRIKE_API_KEY`，普通 API 调用需要带：
+测试 nmap API：
 
 ```bash
-curl -H "X-HexStrike-Api-Key: 你的KEY" \
-  http://127.0.0.1:8888/health
-
-curl -H "X-HexStrike-Api-Key: 你的KEY" \
-  -H "Content-Type: application/json" \
+curl -H "Content-Type: application/json" \
   -d '{"target":"example.com","scan_type":"-sV"}' \
   http://127.0.0.1:8888/api/tools/nmap
-```
-
-默认 `/health` 允许不带 Key，方便 Docker 健康检查。要强制 `/health` 也校验 Key，把 `.env` 改成：
-
-```bash
-HEXSTRIKE_API_KEY_ALLOW_HEALTH=false
 ```
 
 ## 常用命令
@@ -104,6 +94,14 @@ make shell             # 进入容器
 ./hexstrike_mcp.py     # MCP 顶层启动器，默认转进 Docker 容器
 make health            # 健康检查
 make down              # 停止
+```
+
+不用 Compose 的一条龙重装：
+
+```bash
+docker rm -f hexstrike-ai 2>/dev/null || true
+docker rmi hexstrike-ai:docker 2>/dev/null || true
+./scripts/docker-run.sh
 ```
 
 ## ffuf 快速用法
@@ -233,16 +231,7 @@ requirements-mcp.txt
 
 注意：这是 stdio MCP 方式。若你要把它接到需要 HTTP/SSE/Streamable HTTP 的平台，需要额外加 MCP 网关或反代桥接层。
 
-## API Key 配置
-
-`.env` 里重点配置：
-
-```bash
-HEXSTRIKE_API_KEY=change_me_to_a_long_random_value
-HEXSTRIKE_API_KEY_HEADER=X-HexStrike-Api-Key
-```
-
-MCP 客户端同样读取这两个环境变量，不需要改容器里的上游 `hexstrike_mcp.py`。
+## 第三方平台 Key 配置
 
 第三方平台 Key 都放 `.env`：
 
@@ -288,7 +277,7 @@ INSTALL_GO_TOOLS=false INSTALL_PY_TOOLS=false docker build -t hexstrike-ai:docke
 HEXSTRIKE_BIND=0.0.0.0 ./scripts/docker-run.sh
 ```
 
-必须同时设置强随机 `HEXSTRIKE_API_KEY`，并在公网前面加 Cloudflare Access / Basic Auth / VPN。
+改成 `0.0.0.0` 后，请放在 VPN、Cloudflare Access、Basic Auth、可信内网或其他访问控制后面。
 
 ## 数据目录
 
@@ -321,5 +310,5 @@ python3 hexstrike_mcp.py
 
 - 容器内包含大量安全工具，默认以 root 运行，能力很强，不要公开暴露。
 - `cap_add: NET_RAW, NET_ADMIN` 是为了 nmap/masscan/arp-scan 等网络工具可用；不需要二层/原始包扫描时可以删掉。
-- 不要把真实 API Key 提交到 GitHub；只提交 `.env.example`。
+- 不要把真实第三方平台 Key 提交到 GitHub；只提交 `.env.example`。
 - 对互联网目标跑高并发扫描前，确认授权范围和速率限制。
