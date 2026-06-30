@@ -36,10 +36,13 @@ RUN python3 -m venv /opt/hexstrike/venv && \
 
 COPY docker/entrypoint.sh /entrypoint.sh
 COPY scripts/healthcheck.sh /usr/local/bin/hexstrike-healthcheck
+COPY scripts/ffufx.sh /usr/local/bin/ffufx
+COPY wordlists /opt/hexstrike-docker-wordlists
 
-RUN chmod +x /entrypoint.sh /usr/local/bin/hexstrike-healthcheck && \
-    mkdir -p /workspace /reports /data /root/.config/hexstrike /root/.cache && \
-    ln -sf /opt/hexstrike/venv/bin/python /usr/local/bin/hexstrike-python
+RUN chmod +x /entrypoint.sh /usr/local/bin/hexstrike-healthcheck /usr/local/bin/ffufx && \
+    mkdir -p /workspace /workspace/wordlists /reports /data /root/.config/hexstrike /root/.cache && \
+    ln -sf /opt/hexstrike/venv/bin/python /usr/local/bin/hexstrike-python && \
+    cp -a /opt/hexstrike-docker-wordlists /workspace/wordlists/hexstrike-custom || true
 
 EXPOSE 8888
 
