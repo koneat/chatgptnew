@@ -12,7 +12,6 @@ BIND="${HEXSTRIKE_BIND:-127.0.0.1}"
 if [ ! -f .env ]; then
   cp .env.example .env
   echo "[+] created .env from .env.example"
-  echo "[!] edit .env and change HEXSTRIKE_API_KEY after first start"
 fi
 
 mkdir -p workspace reports data config
