@@ -10,6 +10,8 @@ PORT="${HEXSTRIKE_PORT:-8888}"
 BIND="${HEXSTRIKE_BIND:-127.0.0.1}"
 BUILD_LOG="${BUILD_LOG:-${ROOT_DIR}/build.log}"
 FAST_BUILD="${FAST_BUILD:-false}"
+READY_URL="http://127.0.0.1:${PORT}/api/cache/stats"
+HEALTH_URL="http://127.0.0.1:${PORT}/health"
 
 log() { printf '[+] %s\n' "$*"; }
 warn() { printf '[!] %s\n' "$*" >&2; }
@@ -75,18 +77,19 @@ docker run -d \
   --restart unless-stopped \
   "${IMAGE_NAME}"
 
-log "waiting for API..."
-for i in $(seq 1 30); do
-  if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
-    log "HexStrike API is ready: http://127.0.0.1:${PORT}/health"
+log "waiting for lightweight API readiness..."
+for i in $(seq 1 60); do
+  if curl -fsS --max-time 3 "${READY_URL}" >/dev/null 2>&1; then
+    log "HexStrike API is ready: ${READY_URL}"
+    log "Full tool health check is slower: ${HEALTH_URL}"
     exit 0
   fi
   if [ $((i % 5)) -eq 0 ]; then
-    printf '[api wait %02ds] still waiting for :%s/health\n' "$((i * 2))" "${PORT}"
+    printf '[api wait %02ds] still waiting for lightweight readiness endpoint\n' "$((i * 2))"
   fi
   sleep 2
 done
 
 warn "API not ready yet. Check logs: docker logs -f ${CONTAINER_NAME}"
-docker logs --tail=80 "${CONTAINER_NAME}" 2>&1 || true
+docker logs --tail=120 "${CONTAINER_NAME}" 2>&1 || true
 exit 1
