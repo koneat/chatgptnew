@@ -27,12 +27,19 @@ if [ "${FAST_BUILD}" = "true" ]; then
   warn "FAST_BUILD=true: skip extra Go/Python CLI tools for faster first build"
 fi
 
+progress_args=()
+if docker build --help 2>&1 | grep -q -- '--progress'; then
+  progress_args+=(--progress=plain)
+else
+  warn "this Docker build does not support --progress; using legacy build output"
+fi
+
 log "building image: ${IMAGE_NAME}"
 log "full build log: ${BUILD_LOG}"
 log "Docker may spend a long time on apt, go install, and pip install. This is normal on first build."
 
 set +e
-docker build --progress=plain "${build_args[@]}" -t "${IMAGE_NAME}" . 2>&1 | tee "${BUILD_LOG}"
+docker build "${progress_args[@]}" "${build_args[@]}" -t "${IMAGE_NAME}" . 2>&1 | tee "${BUILD_LOG}"
 build_rc=${PIPESTATUS[0]}
 set -e
 
