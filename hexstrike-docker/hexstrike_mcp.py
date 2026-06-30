@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""
-HexStrike physical-machine MCP launcher.
+"""HexStrike MCP launcher.
 
-Default flow:
-  MCP client -> this launcher on the physical host -> upstream HexStrike MCP on the physical host -> HexStrike API :8888
+Default flow for the packaged Docker setup:
+  MCP client -> this launcher -> docker exec -i hexstrike-ai /entrypoint.sh mcp
 
-Docker can still run the HexStrike API server, but the MCP process itself runs
-on the physical machine when --mode physical is used. This is the default.
+The HexStrike API server can run inside Docker while the MCP client starts this
+small launcher on the host. The launcher prefers the Docker MCP runtime because
+it already contains the upstream HexStrike MCP file and Python dependencies.
 """
 from __future__ import annotations
 
@@ -44,9 +44,11 @@ def merged_env() -> Dict[str, str]:
     env = os.environ.copy()
     for key, value in load_dotenv(ENV_FILE).items():
         env.setdefault(key, value)
-    env.setdefault("HEXSTRIKE_PORT", "8888")
-    env.setdefault("HEXSTRIKE_SERVER", f"http://127.0.0.1:{env.get('HEXSTRIKE_PORT', '8888')}")
+
     env.setdefault("HEXSTRIKE_CONTAINER_NAME", "hexstrike-ai")
+    env.setdefault("HEXSTRIKE_CONTAINER_PORT", "8888")
+    env.setdefault("HEXSTRIKE_HOST_PORT", "8888")
+    env.setdefault("HEXSTRIKE_SERVER", "http://127.0.0.1:8888")
     return env
 
 
@@ -74,7 +76,8 @@ def container_running(container_name: str, env: Dict[str, str]) -> bool:
 
 def build_docker_exec(env: Dict[str, str], extra_args: Iterable[str]) -> List[str]:
     container = env.get("HEXSTRIKE_CONTAINER_NAME", "hexstrike-ai")
-    server = env.get("HEXSTRIKE_SERVER", f"http://127.0.0.1:{env.get('HEXSTRIKE_PORT', '8888')}")
+    container_port = env.get("HEXSTRIKE_CONTAINER_PORT", "8888")
+    server = env.get("HEXSTRIKE_SERVER_IN_CONTAINER", f"http://127.0.0.1:{container_port}")
 
     cmd = [
         "docker", "exec", "-i",
@@ -87,34 +90,40 @@ def build_docker_exec(env: Dict[str, str], extra_args: Iterable[str]) -> List[st
 
 
 def build_physical_exec(env: Dict[str, str], extra_args: Iterable[str]) -> List[str]:
-    upstream_mcp = env.get("HEXSTRIKE_UPSTREAM_MCP", "").strip()
-    if not upstream_mcp:
-        upstream_mcp = str(DEFAULT_UPSTREAM_MCP)
-
+    upstream_mcp = env.get("HEXSTRIKE_UPSTREAM_MCP", "").strip() or str(DEFAULT_UPSTREAM_MCP)
     mcp_path = Path(upstream_mcp).expanduser()
     if not mcp_path.exists():
         raise SystemExit(
-            "Physical MCP is not installed yet. Run:\n"
-            "  ./scripts/install-physical-mcp.sh\n"
-            "Then start again:\n"
-            "  .venv-mcp/bin/python hexstrike_mcp.py"
+            "Physical MCP files are not installed. Use --mode docker, or install the upstream MCP files first."
         )
 
-    server = env.get("HEXSTRIKE_SERVER", f"http://127.0.0.1:{env.get('HEXSTRIKE_PORT', '8888')}")
+    server = env.get("HEXSTRIKE_SERVER", "http://127.0.0.1:8888")
     cmd = [sys.executable, str(mcp_path), "--server", server]
     cmd.extend(extra_args)
     return cmd
+
+
+def resolve_mode(requested_mode: str, env: Dict[str, str]) -> str:
+    if requested_mode != "auto":
+        return requested_mode
+
+    container = env.get("HEXSTRIKE_CONTAINER_NAME", "hexstrike-ai")
+    if container_running(container, env):
+        return "docker"
+    if DEFAULT_UPSTREAM_MCP.exists():
+        return "physical"
+    return "docker"
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="HexStrike MCP launcher")
     parser.add_argument(
         "--mode",
-        choices=("physical", "local", "docker"),
-        default=os.environ.get("HEXSTRIKE_MCP_MODE", "physical"),
-        help="physical/local runs MCP on this host; docker runs MCP inside container",
+        choices=("auto", "docker", "physical", "local"),
+        default=os.environ.get("HEXSTRIKE_MCP_MODE", "auto"),
+        help="auto prefers Docker when the hexstrike-ai container is running",
     )
-    parser.add_argument("--server", default=None, help="HexStrike API server, default from HEXSTRIKE_SERVER or 127.0.0.1:8888")
+    parser.add_argument("--server", default=None, help="Host-side HexStrike API URL for physical mode")
     parser.add_argument("--container", default=None, help="Docker container name, default hexstrike-ai")
     parser.add_argument("--print-command", action="store_true", help="Print resolved command and exit")
     args, unknown = parser.parse_known_args()
@@ -125,15 +134,16 @@ def main() -> int:
     if args.container:
         env["HEXSTRIKE_CONTAINER_NAME"] = args.container
 
-    if args.mode == "docker":
+    mode = resolve_mode(args.mode, env)
+
+    if mode == "docker":
         if not docker_available():
             print("[hexstrike_mcp] docker command not found", file=sys.stderr)
             return 127
         container = env.get("HEXSTRIKE_CONTAINER_NAME", "hexstrike-ai")
         if not container_running(container, env):
             print(
-                f"[hexstrike_mcp] container '{container}' is not running. "
-                "Start it first with ./scripts/docker-run.sh or docker run.",
+                f"[hexstrike_mcp] container '{container}' is not running. Start it first.",
                 file=sys.stderr,
             )
             return 2
