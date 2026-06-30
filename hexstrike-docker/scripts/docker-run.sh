@@ -6,12 +6,13 @@ cd "${ROOT_DIR}"
 
 IMAGE_NAME="${IMAGE_NAME:-hexstrike-ai:docker}"
 CONTAINER_NAME="${CONTAINER_NAME:-hexstrike-ai}"
-PORT="${HEXSTRIKE_PORT:-8888}"
-BIND="${HEXSTRIKE_BIND:-127.0.0.1}"
+BIND_ADDR="${HEXSTRIKE_BIND:-127.0.0.1}"
+HOST_PORT="${HEXSTRIKE_HOST_PORT:-8888}"
+CONTAINER_PORT="8888"
 BUILD_LOG="${BUILD_LOG:-${ROOT_DIR}/build.log}"
 FAST_BUILD="${FAST_BUILD:-false}"
-READY_URL="http://127.0.0.1:${PORT}/api/cache/stats"
-HEALTH_URL="http://127.0.0.1:${PORT}/health"
+READY_URL="http://${BIND_ADDR}:${HOST_PORT}/api/cache/stats"
+HEALTH_URL="http://${BIND_ADDR}:${HOST_PORT}/health"
 
 log() { printf '[+] %s\n' "$*"; }
 warn() { printf '[!] %s\n' "$*" >&2; }
@@ -60,13 +61,14 @@ if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
 fi
 
 log "starting container: ${CONTAINER_NAME}"
+log "port mapping: ${BIND_ADDR}:${HOST_PORT}->${CONTAINER_PORT}/tcp"
 docker run -d \
   --name "${CONTAINER_NAME}" \
   --env-file .env \
   -e HEXSTRIKE_HOST=0.0.0.0 \
-  -e HEXSTRIKE_PORT="${PORT}" \
+  -e HEXSTRIKE_PORT="${CONTAINER_PORT}" \
   -e PYTHONUNBUFFERED=1 \
-  -p "${BIND}:${PORT}:8888" \
+  -p "${BIND_ADDR}:${HOST_PORT}:${CONTAINER_PORT}" \
   -v "${ROOT_DIR}/workspace:/workspace" \
   -v "${ROOT_DIR}/reports:/reports" \
   -v "${ROOT_DIR}/data:/data" \
@@ -81,15 +83,16 @@ log "waiting for lightweight API readiness..."
 for i in $(seq 1 60); do
   if curl -fsS --max-time 3 "${READY_URL}" >/dev/null 2>&1; then
     log "HexStrike API is ready: ${READY_URL}"
-    log "Full tool health check is slower: ${HEALTH_URL}"
+    log "Full tool health check is slower/heavier: ${HEALTH_URL}"
     exit 0
   fi
   if [ $((i % 5)) -eq 0 ]; then
-    printf '[api wait %02ds] still waiting for lightweight readiness endpoint\n' "$((i * 2))"
+    printf '[api wait %02ds] still waiting for %s\n' "$((i * 2))" "${READY_URL}"
   fi
   sleep 2
 done
 
 warn "API not ready yet. Check logs: docker logs -f ${CONTAINER_NAME}"
+docker ps -a | grep "${CONTAINER_NAME}" || true
 docker logs --tail=120 "${CONTAINER_NAME}" 2>&1 || true
 exit 1
