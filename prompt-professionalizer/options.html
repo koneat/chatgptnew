@@ -45,14 +45,14 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
     <header>
       <div>
         <h1>Prompt Professionalizer</h1>
-        <p>在 AI 对话框侧边单击当前模板，即可优化并直接替换输入内容。</p>
+        <p>在 AI 对话框末端单击绿色 P，即可优化并直接替换输入内容。</p>
       </div>
       <button id="save-all" class="primary">保存全部设置</button>
     </header>
 
     <section class="card">
       <div class="section-head">
-        <div><h2>模型接口</h2><p>模板统一使用当前模型；API Key 仅保存在本机 Chrome 扩展存储中。</p></div>
+        <div><h2>模型接口</h2><p>请求超时、最大输入字符数与当前模型配置一起保存；API Key 仅保存在本机。</p></div>
         <div class="actions"><button id="add-provider">新增模型</button><button id="delete-provider" class="danger">删除当前模型</button></div>
       </div>
 
@@ -60,10 +60,12 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
       <div class="grid two">
         <label>配置名称<input id="provider-name" placeholder="例如：OpenRouter"></label>
         <label>模型名称<input id="provider-model" list="model-list" placeholder="例如：openai/gpt-4.1-mini"><datalist id="model-list"></datalist></label>
-        <label>Base URL<input id="provider-base-url" placeholder="https://api.openai.com"></label>
-        <label>接口路径<input id="provider-path" placeholder="/v1/chat/completions"></label>
+        <label>Base URL<input id="provider-base-url" placeholder="https://api.openai.com/v1"></label>
+        <label>接口路径<input id="provider-path" placeholder="/chat/completions"></label>
         <label class="span-two">API Key<div class="secret-row"><input id="provider-api-key" type="password" autocomplete="off" placeholder="允许留空，用于本地无鉴权接口"><button id="toggle-key" type="button">显示</button></div></label>
         <label>Temperature<input id="provider-temperature" type="number" min="0" max="2" step="0.1"></label>
+        <label>请求超时（毫秒）<input id="provider-timeout-ms" type="number" min="1000" max="180000" step="1000"></label>
+        <label>最大输入字符数<input id="provider-max-input-chars" type="number" min="100" max="100000" step="100"></label>
         <label>附加请求头 JSON<input id="provider-headers" placeholder='{"HTTP-Referer":"https://example.com"}'></label>
       </div>
       <div class="actions footer-actions"><button id="fetch-models">拉取模型列表</button><button id="test-provider">验证接口</button><span id="provider-status" class="status"></span></div>
@@ -71,7 +73,7 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
 
     <section class="card">
       <div class="section-head">
-        <div><h2>优化模板</h2><p>侧边菜单选择一次后会立即保存为默认模式，后续单击按钮持续使用该模板。</p></div>
+        <div><h2>优化模板</h2><p>默认只保留一个模板；需要其他模式时自行添加。右键 P 可切换默认模板。</p></div>
         <button id="add-template">新增模板</button>
       </div>
       <label>默认模板<select id="default-template"></select></label>
@@ -79,12 +81,8 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
     </section>
 
     <section class="card">
-      <h2>通用策略</h2>
+      <h2>全局提示词规则</h2>
       <label>系统提示词<textarea id="global-system-prompt" rows="7"></textarea></label>
-      <div class="grid two">
-        <label>请求超时（毫秒）<input id="timeout-ms" type="number" min="5000" max="180000" step="1000"></label>
-        <label>最大输入字符数<input id="max-input-chars" type="number" min="100" max="100000" step="100"></label>
-      </div>
     </section>
 
     <div id="save-status" class="save-status" role="status"></div>
