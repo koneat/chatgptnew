@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prompt Professionalizer 设置</title>
+  <style>
+:root { color-scheme:light dark; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:#0b1120; color:#e2e8f0; }
+* { box-sizing:border-box; }
+body { margin:0; background:linear-gradient(135deg,#0b1120,#111827 55%,#172554); min-height:100vh; }
+.layout { width:min(1080px,calc(100% - 32px)); margin:0 auto; padding:34px 0 60px; }
+header { display:flex; justify-content:space-between; gap:24px; align-items:flex-start; margin-bottom:22px; }
+h1 { margin:0 0 8px; font-size:30px; }
+h2 { margin:0 0 6px; font-size:18px; }
+p { margin:0; color:#94a3b8; line-height:1.55; }
+.card { margin:16px 0; padding:20px; border:1px solid #263449; border-radius:16px; background:rgba(15,23,42,.88); box-shadow:0 18px 50px rgba(0,0,0,.2); }
+.section-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
+.grid { display:grid; gap:14px; margin-top:14px; }
+.grid.two { grid-template-columns:1fr 1fr; }
+.span-two { grid-column:span 2; }
+label { display:flex; flex-direction:column; gap:7px; color:#cbd5e1; font-size:13px; font-weight:600; }
+input,select,textarea { width:100%; border:1px solid #334155; border-radius:10px; padding:10px 11px; outline:none; background:#020617; color:#e2e8f0; font:13px/1.4 inherit; }
+textarea { resize:vertical; }
+input:focus,select:focus,textarea:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.18); }
+button { border:1px solid #475569; border-radius:9px; padding:9px 12px; background:#1e293b; color:#e2e8f0; cursor:pointer; font-weight:700; }
+button:hover { background:#334155; }
+button.primary { border-color:#4f46e5; background:#4f46e5; color:#fff; }
+button.danger { border-color:#7f1d1d; color:#fecaca; }
+.actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.footer-actions { margin-top:14px; }
+.secret-row { display:grid; grid-template-columns:1fr auto; gap:8px; }
+.template-list { display:grid; gap:12px; margin-top:14px; }
+.template-card { display:grid; grid-template-columns:minmax(180px,260px) 1fr auto; gap:10px; align-items:end; padding:14px; border:1px solid #2b3a50; border-radius:12px; background:#0b1220; }
+.template-card .instruction { grid-column:1 / -2; }
+.template-card .delete { align-self:stretch; }
+.checkbox { flex-direction:row; align-items:center; justify-content:flex-start; padding-top:24px; }
+.checkbox input { width:auto; }
+.status { color:#93c5fd; font-size:13px; }
+.save-status { position:fixed; right:22px; bottom:22px; min-width:180px; max-width:360px; padding:11px 14px; border-radius:10px; background:#14532d; color:#fff; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; }
+.save-status.show { opacity:1; transform:none; }
+.save-status.error { background:#7f1d1d; }
+@media (max-width:850px) { .grid.two { grid-template-columns:1fr; } .span-two { grid-column:auto; } .template-card { grid-template-columns:1fr auto; } .template-card .instruction { grid-column:1 / -1; } header,.section-head { flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <header>
+      <div>
+        <h1>Prompt Professionalizer</h1>
+        <p>在 AI 对话框侧边单击当前模板，即可优化并直接替换输入内容。</p>
+      </div>
+      <button id="save-all" class="primary">保存全部设置</button>
+    </header>
+
+    <section class="card">
+      <div class="section-head">
+        <div><h2>模型接口</h2><p>默认使用 OpenRouter Free；填写 OpenRouter API Key 后验证。请求固定优先低延迟节点并允许故障回退。</p></div>
+        <div class="actions"><button id="add-provider">新增模型</button><button id="delete-provider" class="danger">删除当前模型</button></div>
+      </div>
+
+      <label>当前模型配置<select id="provider-select"></select></label>
+      <div class="grid two">
+        <label>配置名称<input id="provider-name" placeholder="例如：OpenRouter"></label>
+        <label>模型名称<input id="provider-model" list="model-list" placeholder="openrouter/free"><datalist id="model-list"></datalist></label>
+        <label>Base URL<input id="provider-base-url" placeholder="https://openrouter.ai/api/v1"></label>
+        <label>接口路径<input id="provider-path" placeholder="/chat/completions"></label>
+        <label class="span-two">API Key<div class="secret-row"><input id="provider-api-key" type="password" autocomplete="off" placeholder="允许留空，用于本地无鉴权接口"><button id="toggle-key" type="button">显示</button></div></label>
+        <label>Temperature<input id="provider-temperature" type="number" min="0" max="2" step="0.1"></label>
+        <label>请求超时（毫秒）<input id="provider-timeout-ms" type="number" min="1000" max="180000" step="1000"></label>
+        <label>最大输入字符数<input id="provider-max-input-chars" type="number" min="100" max="100000" step="100"></label>
+        <label>最大输出 Token<input id="provider-max-output-tokens" type="number" min="32" max="16384" step="32"></label>
+        <label class="checkbox"><input id="provider-fast-mode" type="checkbox">快速模式（限制输出长度，减少等待）</label>
+        <label>附加请求头 JSON<input id="provider-headers" placeholder='{"HTTP-Referer":"https://example.com"}'></label>
+      </div>
+      <div class="actions footer-actions"><button id="fetch-models">拉取模型列表</button><button id="test-provider">验证接口</button><span id="provider-status" class="status"></span></div>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div><h2>优化模板</h2><p>模板名称和优化规则均可自定义；选择默认模板或点击保存后会持久化到本机扩展存储。</p></div>
+        <div class="actions"><button id="add-template">新增模板</button><button id="save-templates" class="primary">保存模板</button></div>
+      </div>
+      <label>默认模板<select id="default-template"></select></label>
+      <div id="template-list" class="template-list"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <div><h2>全局提示词规则</h2><p>系统提示词可完全自定义。内置强制规则始终生效：最终必须输出简体中文，所有包含 @ 的标识、账号与邮箱必须逐字原样保留。</p></div>
+        <button id="save-global-prompt" class="primary">保存系统提示词</button>
+      </div>
+      <label>系统提示词<textarea id="global-system-prompt" rows="7" placeholder="输入所有模板共同遵循的系统规则"></textarea></label>
+    </section>
+
+    <div id="save-status" class="save-status" role="status"></div>
+  </main>
+  <script src="options-status.js"></script>
+  <script src="options.js"></script>
+  <script src="options-module-save.js"></script>
+</body>
+</html>

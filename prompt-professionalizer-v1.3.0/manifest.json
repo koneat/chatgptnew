@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Professionalizer",
+  "version": "1.3.0",
+  "description": "OpenRouter 单请求严格保真专业化改写：默认本地靶场/授权红队背景，减少安全行业口语歧义。",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://openrouter.ai/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://chat.deepseek.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://grok.com/*",
+    "https://www.perplexity.ai/*",
+    "https://poe.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker-v4.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Prompt Professionalizer 设置"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://chat.deepseek.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://grok.com/*",
+        "https://www.perplexity.ai/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "enhance-active-input": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+M",
+        "mac": "Command+Shift+M"
+      },
+      "description": "专业化并替换当前输入框中的文字"
+    }
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "options_page": "options.html"
+}

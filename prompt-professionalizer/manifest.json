@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Professionalizer",
+  "version": "0.9.0",
+  "description": "强制中文输出并逐字保留所有 @ 标识，不合格结果自动重试且不会覆盖输入框。",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://chat.deepseek.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://grok.com/*",
+    "https://www.perplexity.ai/*",
+    "https://poe.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker-v4.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Prompt Professionalizer 设置"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://chat.deepseek.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://grok.com/*",
+        "https://www.perplexity.ai/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "content-script.js",
+        "content-status.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "enhance-active-input": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+M",
+        "mac": "Command+Shift+M"
+      },
+      "description": "优化并替换当前输入框中的提示词"
+    }
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "options_page": "options.html"
+}
