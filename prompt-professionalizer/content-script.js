@@ -245,7 +245,8 @@
       root.querySelector(".copy").textContent = "已复制";
     });
     host.addEventListener("pointerdown", (event) => {
-      if (event.target === host) close();
+      const panel = root.querySelector(".panel");
+      if (!event.composedPath().includes(panel)) close();
     });
     document.documentElement.appendChild(host);
     state.preview = host;
