@@ -20,7 +20,6 @@ function bindEvents() {
     activeProviderId = $("#provider-select").value;
     settings.activeProviderId = activeProviderId;
     renderProviderForm();
-    renderTemplates();
   });
   $("#add-provider").addEventListener("click", addProvider);
   $("#delete-provider").addEventListener("click", deleteProvider);
@@ -28,7 +27,10 @@ function bindEvents() {
   $("#fetch-models").addEventListener("click", fetchModels);
   $("#test-provider").addEventListener("click", testProvider);
   $("#add-template").addEventListener("click", addTemplate);
-  $("#default-template").addEventListener("change", () => { settings.defaultTemplateId = $("#default-template").value; });
+  $("#default-template").addEventListener("change", async () => {
+    settings.defaultTemplateId = $("#default-template").value;
+    await saveAll();
+  });
   $("#save-all").addEventListener("click", saveAll);
 }
 
@@ -39,15 +41,12 @@ function renderAll() {
   $("#global-system-prompt").value = settings.globalSystemPrompt || "";
   $("#timeout-ms").value = settings.timeoutMs;
   $("#max-input-chars").value = settings.maxInputChars;
-  $("#show-preview").checked = settings.showPreview !== false;
 }
 
 function renderProviderSelect() {
   const select = $("#provider-select");
   select.textContent = "";
-  for (const provider of settings.providers) {
-    select.add(new Option(provider.name, provider.id));
-  }
+  for (const provider of settings.providers) select.add(new Option(provider.name, provider.id));
   if (!settings.providers.some((item) => item.id === activeProviderId)) activeProviderId = settings.providers[0]?.id;
   select.value = activeProviderId;
 }
@@ -94,7 +93,6 @@ function addProvider() {
   settings.activeProviderId = id;
   renderProviderSelect();
   renderProviderForm();
-  renderTemplates();
 }
 
 function deleteProvider() {
@@ -102,14 +100,10 @@ function deleteProvider() {
   const provider = currentProvider();
   if (!confirm(`确定删除模型配置“${provider.name}”吗？`)) return;
   settings.providers = settings.providers.filter((item) => item.id !== provider.id);
-  for (const template of settings.templates) {
-    if (template.providerId === provider.id) template.providerId = "";
-  }
   activeProviderId = settings.providers[0].id;
   settings.activeProviderId = activeProviderId;
   renderProviderSelect();
   renderProviderForm();
-  renderTemplates();
 }
 
 function renderTemplates() {
@@ -124,22 +118,14 @@ function renderTemplates() {
     card.className = "template-card";
     card.dataset.id = template.id;
     card.innerHTML = `
-      <label>图标<input class="icon" maxlength="2"></label>
       <label>模板名称<input class="name"></label>
-      <label>指定模型配置<select class="provider"><option value="">使用当前模型</option></select></label>
-      <label>覆盖模型名<input class="model" placeholder="留空继承"></label>
+      <span></span>
       <button class="delete danger" type="button">删除</button>
       <label class="instruction">优化规则<textarea rows="4"></textarea></label>
     `;
-    card.querySelector(".icon").value = template.icon || "优";
     card.querySelector(".name").value = template.name || "";
-    card.querySelector(".model").value = template.model || "";
     card.querySelector("textarea").value = template.instruction || "";
-    const providerSelect = card.querySelector(".provider");
-    for (const provider of settings.providers) providerSelect.add(new Option(provider.name, provider.id));
-    providerSelect.value = template.providerId || "";
-
-    card.querySelectorAll("input,textarea,select").forEach((input) => input.addEventListener("input", () => persistTemplateCard(card)));
+    card.querySelectorAll("input,textarea").forEach((input) => input.addEventListener("input", () => persistTemplateCard(card)));
     card.querySelector(".delete").addEventListener("click", () => deleteTemplate(template.id));
     list.appendChild(card);
   }
@@ -149,10 +135,7 @@ function renderTemplates() {
 function persistTemplateCard(card) {
   const template = settings.templates.find((item) => item.id === card.dataset.id);
   if (!template) return;
-  template.icon = card.querySelector(".icon").value.trim().slice(0, 2) || "优";
   template.name = card.querySelector(".name").value.trim() || "未命名模板";
-  template.providerId = card.querySelector(".provider").value;
-  template.model = card.querySelector(".model").value.trim();
   template.instruction = card.querySelector("textarea").value.trim();
   const option = [...$("#default-template").options].find((item) => item.value === template.id);
   if (option) option.textContent = template.name;
@@ -160,7 +143,7 @@ function persistTemplateCard(card) {
 
 function addTemplate() {
   const id = crypto.randomUUID();
-  settings.templates.push({ id, name: "新模板", icon: "优", instruction: "在不改变原意的前提下优化提示词。", providerId: "", model: "" });
+  settings.templates.push({ id, name: "新模板", instruction: "在不改变原意的前提下优化提示词。" });
   renderTemplates();
   document.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -211,7 +194,6 @@ async function saveAll() {
     settings.globalSystemPrompt = $("#global-system-prompt").value.trim();
     settings.timeoutMs = Number($("#timeout-ms").value);
     settings.maxInputChars = Number($("#max-input-chars").value);
-    settings.showPreview = $("#show-preview").checked;
     for (const card of document.querySelectorAll(".template-card")) persistTemplateCard(card);
     await ensureOriginPermission(currentProvider().baseUrl);
     const response = await chrome.runtime.sendMessage({ action: "save-settings", settings });
