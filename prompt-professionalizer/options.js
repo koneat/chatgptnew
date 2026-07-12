@@ -57,7 +57,7 @@ function renderProviderForm() {
   $("#provider-base-url").value = provider.baseUrl || "";
   $("#provider-path").value = provider.path || "/chat/completions";
   $("#provider-api-key").value = provider.apiKey || "";
-  $("#provider-temperature").value = provider.temperature ?? 0.2;
+  $("#provider-temperature").value = provider.temperature ?? 0.1;
   $("#provider-timeout-ms").value = provider.timeoutMs ?? 15000;
   $("#provider-max-input-chars").value = provider.maxInputChars ?? 9999;
   $("#provider-max-output-tokens").value = provider.maxOutputTokens ?? 640;
@@ -80,7 +80,7 @@ function persistProviderForm() {
   provider.baseUrl = $("#provider-base-url").value.trim();
   provider.path = $("#provider-path").value.trim() || "/chat/completions";
   provider.apiKey = $("#provider-api-key").value.trim();
-  provider.temperature = Number($("#provider-temperature").value || 0.2);
+  provider.temperature = Number($("#provider-temperature").value || 0.1);
   provider.timeoutMs = Number($("#provider-timeout-ms").value || 15000);
   provider.maxInputChars = Number($("#provider-max-input-chars").value || 9999);
   provider.maxOutputTokens = Number($("#provider-max-output-tokens").value || 640);
@@ -250,7 +250,7 @@ function providerConfigSnapshot(provider) {
     path: provider?.path || "",
     apiKey: provider?.apiKey || "",
     model: provider?.model || "",
-    temperature: Number(provider?.temperature ?? 0.2),
+    temperature: Number(provider?.temperature ?? 0.1),
     timeoutMs: Number(provider?.timeoutMs ?? 15000),
     maxInputChars: Number(provider?.maxInputChars ?? 9999),
     fastMode: provider?.fastMode !== false,
