@@ -99,7 +99,7 @@ function addProvider() {
     path: "/chat/completions",
     apiKey: "",
     model: "openrouter/free",
-    temperature: 0.2,
+    temperature: 0.1,
     timeoutMs: 15000,
     maxInputChars: 9999,
     maxOutputTokens: 640,
