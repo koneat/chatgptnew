@@ -39,8 +39,6 @@ function renderAll() {
   renderProviderForm();
   renderTemplates();
   $("#global-system-prompt").value = settings.globalSystemPrompt || "";
-  $("#timeout-ms").value = settings.timeoutMs;
-  $("#max-input-chars").value = settings.maxInputChars;
 }
 
 function renderProviderSelect() {
@@ -57,9 +55,11 @@ function renderProviderForm() {
   $("#provider-name").value = provider.name || "";
   $("#provider-model").value = provider.model || "";
   $("#provider-base-url").value = provider.baseUrl || "";
-  $("#provider-path").value = provider.path || "/v1/chat/completions";
+  $("#provider-path").value = provider.path || "/chat/completions";
   $("#provider-api-key").value = provider.apiKey || "";
-  $("#provider-temperature").value = provider.temperature ?? 0.2;
+  $("#provider-temperature").value = provider.temperature ?? 0.3;
+  $("#provider-timeout-ms").value = provider.timeoutMs ?? 6000;
+  $("#provider-max-input-chars").value = provider.maxInputChars ?? 9999;
   $("#provider-headers").value = provider.extraHeaders || "{}";
   $("#provider-status").textContent = "";
 }
@@ -70,9 +70,11 @@ function persistProviderForm() {
   provider.name = $("#provider-name").value.trim() || "未命名模型";
   provider.model = $("#provider-model").value.trim();
   provider.baseUrl = $("#provider-base-url").value.trim();
-  provider.path = $("#provider-path").value.trim() || "/v1/chat/completions";
+  provider.path = $("#provider-path").value.trim() || "/chat/completions";
   provider.apiKey = $("#provider-api-key").value.trim();
-  provider.temperature = Number($("#provider-temperature").value || 0.2);
+  provider.temperature = Number($("#provider-temperature").value || 0.3);
+  provider.timeoutMs = Number($("#provider-timeout-ms").value || 6000);
+  provider.maxInputChars = Number($("#provider-max-input-chars").value || 9999);
   provider.extraHeaders = $("#provider-headers").value.trim() || "{}";
 }
 
@@ -82,11 +84,13 @@ function addProvider() {
   settings.providers.push({
     id,
     name: "新模型配置",
-    baseUrl: "https://api.openai.com",
-    path: "/v1/chat/completions",
+    baseUrl: "https://api.openai.com/v1",
+    path: "/chat/completions",
     apiKey: "",
     model: "",
-    temperature: 0.2,
+    temperature: 0.3,
+    timeoutMs: 6000,
+    maxInputChars: 9999,
     extraHeaders: "{}"
   });
   activeProviderId = id;
@@ -192,8 +196,6 @@ async function saveAll() {
     settings.activeProviderId = activeProviderId;
     settings.defaultTemplateId = $("#default-template").value;
     settings.globalSystemPrompt = $("#global-system-prompt").value.trim();
-    settings.timeoutMs = Number($("#timeout-ms").value);
-    settings.maxInputChars = Number($("#max-input-chars").value);
     for (const card of document.querySelectorAll(".template-card")) persistTemplateCard(card);
     await ensureOriginPermission(currentProvider().baseUrl);
     const response = await chrome.runtime.sendMessage({ action: "save-settings", settings });
