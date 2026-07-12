@@ -2,6 +2,8 @@
   if (globalThis.__PROMPT_PROFESSIONALIZER_LOADED__) return;
   globalThis.__PROMPT_PROFESSIONALIZER_LOADED__ = true;
 
+  const PRIMARY_HOSTS = new Set(["chatgpt.com", "claude.ai", "gemini.google.com"]);
+
   const state = {
     activeElement: null,
     publicSettings: null,
@@ -81,32 +83,36 @@
       <style>
         :host { all:initial; }
         * { box-sizing:border-box; }
-        .bar { display:flex; align-items:stretch; border:1px solid rgba(148,163,184,.45); border-radius:9px; background:rgba(15,23,42,.95); box-shadow:0 8px 24px rgba(0,0,0,.25); backdrop-filter:blur(8px); font:12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-        button { border:0; color:#fff; background:transparent; cursor:pointer; min-height:30px; font:600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-        button:hover { background:rgba(255,255,255,.12); }
-        button:disabled { opacity:.55; cursor:wait; }
-        .main { max-width:150px; padding:0 10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .toggle { width:28px; padding:0; border-left:1px solid rgba(255,255,255,.14); }
-        .spinner { display:inline-block; width:12px; height:12px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
-        .menu { position:absolute; right:0; bottom:36px; min-width:190px; max-width:280px; padding:6px; border:1px solid rgba(148,163,184,.35); border-radius:11px; background:#0f172a; box-shadow:0 12px 32px rgba(0,0,0,.35); display:none; }
+        .main { width:30px; height:30px; display:grid; place-items:center; border:1px solid rgba(148,163,184,.55); border-radius:999px; background:#334155; color:#fff; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.28); font:800 14px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; user-select:none; }
+        .main.available { border-color:#22c55e; background:#16a34a; box-shadow:0 0 0 2px rgba(34,197,94,.18),0 6px 18px rgba(0,0,0,.28); }
+        .main:hover { filter:brightness(1.1); transform:translateY(-1px); }
+        .main:disabled { opacity:.72; cursor:wait; }
+        .main.loading { animation:pulse .8s ease-in-out infinite alternate; }
+        .menu { position:absolute; right:0; bottom:36px; min-width:190px; max-width:280px; padding:6px; border:1px solid rgba(148,163,184,.35); border-radius:11px; background:#0f172a; box-shadow:0 12px 32px rgba(0,0,0,.35); display:none; font:12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
         .menu.open { display:block; }
-        .item { width:100%; height:auto; min-height:34px; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:8px; text-align:left; }
-        .item.active::after { content:"当前"; color:#a5b4fc; font-size:11px; font-weight:500; }
+        .item { width:100%; min-height:34px; display:flex; align-items:center; justify-content:space-between; gap:10px; border:0; border-radius:8px; padding:8px 10px; background:transparent; color:#fff; cursor:pointer; text-align:left; font:600 12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+        .item:hover { background:rgba(255,255,255,.1); }
+        .item.active::after { content:"当前"; color:#86efac; font-size:11px; font-weight:500; }
         .separator { height:1px; margin:5px 4px; background:#263449; }
         .toast { position:absolute; right:0; bottom:36px; min-width:160px; max-width:320px; padding:9px 11px; border-radius:9px; color:#fff; background:#14532d; box-shadow:0 10px 30px rgba(0,0,0,.25); font:12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-        @keyframes spin { to { transform:rotate(360deg); } }
+        @keyframes pulse { from { transform:scale(.94); } to { transform:scale(1.05); } }
       </style>
-      <div class="bar">
-        <button class="main" type="button" title="单击后直接优化并替换当前输入框"></button>
-        <button class="toggle" type="button" aria-label="选择默认优化模板">▾</button>
-      </div>
+      <button class="main" type="button" aria-label="优化提示词">P</button>
       <div class="menu"></div>
     `;
 
-    root.querySelector(".main").addEventListener("click", () => {
+    const mainButton = root.querySelector(".main");
+    mainButton.classList.toggle("available", PRIMARY_HOSTS.has(location.hostname));
+    mainButton.addEventListener("click", (event) => {
+      if (event.shiftKey) {
+        event.stopPropagation();
+        root.querySelector(".menu").classList.toggle("open");
+        return;
+      }
       enhanceTarget(resolveActiveEditor(), state.publicSettings?.defaultTemplateId).catch(showError);
     });
-    root.querySelector(".toggle").addEventListener("click", (event) => {
+    mainButton.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
       event.stopPropagation();
       root.querySelector(".menu").classList.toggle("open");
     });
@@ -124,10 +130,10 @@
 
   function renderActiveTemplate() {
     const button = state.toolbarRoot?.querySelector(".main");
-    if (!button || state.loading) return;
+    if (!button) return;
     const template = getActiveTemplate();
-    button.textContent = template?.name || "优化并替换";
-    button.title = `使用“${template?.name || "默认模板"}”优化并直接替换当前输入框`;
+    button.textContent = "P";
+    button.title = `左键：使用“${template?.name || "默认模板"}”优化并替换；右键：选择模板`;
   }
 
   function renderMenu() {
@@ -228,6 +234,13 @@
 
   function findBestVisibleEditor() {
     const siteSelectors = [];
+    if (location.hostname === "chatgpt.com") {
+      siteSelectors.push(
+        "#prompt-textarea",
+        "div[contenteditable='true'][data-testid*='composer' i]",
+        "textarea[placeholder*='message' i]"
+      );
+    }
     if (location.hostname === "claude.ai") {
       siteSelectors.push(
         "div.ProseMirror[contenteditable='true']",
@@ -385,9 +398,10 @@
 
     const anchor = getAnchorElement(element);
     const rect = anchor.getBoundingClientRect();
-    const width = Math.min(178, Math.max(116, state.toolbarRoot?.querySelector(".bar")?.getBoundingClientRect().width || 140));
-    const top = Math.max(8, Math.min(window.innerHeight - 38, rect.bottom - 38));
-    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width - 8));
+    const buttonSize = 30;
+    const trailingOffset = PRIMARY_HOSTS.has(location.hostname) ? 44 : 8;
+    const top = Math.max(8, Math.min(window.innerHeight - buttonSize - 8, rect.bottom - buttonSize - 5));
+    const left = Math.max(8, Math.min(window.innerWidth - buttonSize - 8, rect.right - buttonSize - trailingOffset));
     host.style.top = `${top}px`;
     host.style.left = `${left}px`;
     host.style.right = "auto";
@@ -398,12 +412,11 @@
   function setLoading(loading) {
     state.loading = loading;
     const main = state.toolbarRoot?.querySelector(".main");
-    const toggle = state.toolbarRoot?.querySelector(".toggle");
-    if (!main || !toggle) return;
+    if (!main) return;
     main.disabled = loading;
-    toggle.disabled = loading;
-    if (loading) main.innerHTML = '<span class="spinner"></span>';
-    else renderActiveTemplate();
+    main.classList.toggle("loading", loading);
+    main.textContent = "P";
+    if (!loading) renderActiveTemplate();
   }
 
   function getActiveTemplate() {
