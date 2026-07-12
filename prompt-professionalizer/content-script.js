@@ -48,7 +48,6 @@
 
     document.addEventListener("focusin", (event) => activate(event.target), true);
     document.addEventListener("pointerdown", (event) => activate(event.target), true);
-    document.addEventListener("input", (event) => activate(event.target), true);
 
     document.addEventListener("keydown", (event) => {
       if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.key.toLowerCase() !== "m") return;
@@ -62,9 +61,11 @@
     window.addEventListener("resize", scheduleReposition, true);
 
     const observer = new MutationObserver(() => {
-      if (!state.activeElement || !document.contains(state.activeElement) || !isUsableEditor(state.activeElement)) {
-        state.activeElement = findBestVisibleEditor();
-      }
+      const activeValid = state.activeElement
+        && document.contains(state.activeElement)
+        && isUsableEditor(state.activeElement);
+      if (activeValid) return;
+      state.activeElement = findBestVisibleEditor();
       if (state.activeElement) showToolbar();
       else hideToolbar();
     });
@@ -102,7 +103,6 @@
     `;
 
     const mainButton = root.querySelector(".main");
-    mainButton.classList.toggle("available", PRIMARY_HOSTS.has(location.hostname));
     mainButton.addEventListener("click", (event) => {
       if (event.shiftKey) {
         event.stopPropagation();
@@ -191,7 +191,8 @@
       });
       if (!response?.ok) throw new Error(response?.error || "优化失败");
       writeText(target, response.enhancedText);
-      showSuccess(`已按“${response.templateName || "默认模板"}”替换`);
+      const timing = response.cached ? "缓存命中" : (Number.isFinite(response.elapsedMs) ? `${(response.elapsedMs / 1000).toFixed(1)}s` : "");
+      showSuccess(`已按“${response.templateName || "默认模板"}”替换${timing ? `（${timing}）` : ""}`);
     } finally {
       setLoading(false);
     }
@@ -373,7 +374,7 @@
   function showToolbar() {
     if (!state.toolbarHost || !state.activeElement) return;
     state.toolbarHost.style.display = "block";
-    scheduleReposition();
+    if (!hasCustomPosition()) scheduleReposition();
   }
 
   function hideToolbar() {
@@ -381,7 +382,7 @@
   }
 
   function scheduleReposition() {
-    if (state.repositionFrame) return;
+    if (hasCustomPosition() || state.repositionFrame) return;
     state.repositionFrame = requestAnimationFrame(() => {
       state.repositionFrame = 0;
       repositionToolbar();
@@ -393,6 +394,10 @@
     const host = state.toolbarHost;
     if (!element || !host || !document.contains(element) || !isUsableEditor(element)) {
       hideToolbar();
+      return;
+    }
+    if (hasCustomPosition()) {
+      host.style.display = "block";
       return;
     }
 
@@ -407,6 +412,10 @@
     host.style.right = "auto";
     host.style.bottom = "auto";
     host.style.display = rect.bottom < 0 || rect.top > window.innerHeight ? "none" : "block";
+  }
+
+  function hasCustomPosition() {
+    return state.toolbarHost?.dataset?.pCustomPosition === "true";
   }
 
   function setLoading(loading) {
