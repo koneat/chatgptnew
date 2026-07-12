@@ -8,6 +8,8 @@
     "provider-temperature",
     "provider-timeout-ms",
     "provider-max-input-chars",
+    "provider-max-output-tokens",
+    "provider-fast-mode",
     "provider-headers"
   ];
 
@@ -90,6 +92,8 @@
       String(Number(value("provider-temperature") || 0.3)),
       String(Number(value("provider-timeout-ms") || 6000)),
       String(Number(value("provider-max-input-chars") || 9999)),
+      String(document.getElementById("provider-fast-mode")?.checked !== false),
+      String(Number(value("provider-max-output-tokens") || 1200)),
       value("provider-headers") || "{}",
       fingerprint(value("provider-api-key"))
     ].join("\u001f");
