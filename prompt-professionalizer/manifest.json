@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Prompt Professionalizer",
-  "version": "0.3.0",
-  "description": "在 ChatGPT、Claude、Gemini 输入框末端显示绿色 P 按钮，一键专业化并直接替换提示词。",
+  "version": "0.4.0",
+  "description": "P 按钮可自由拖动；支持站点的 Chrome 图标变绿，模型验证可用后输入框 P 变绿。",
   "permissions": [
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "tabs"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
