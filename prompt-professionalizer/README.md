@@ -1,5 +1,20 @@
 # Prompt Professionalizer
 
+## v0.8.0 OpenRouter 快速稳定默认配置
+
+- 默认 Base URL：`https://openrouter.ai/api/v1`
+- 默认模型：`openrouter/free`
+- 默认接口路径：`/chat/completions`
+- Temperature：`0.2`
+- 请求超时：`15000` 毫秒
+- 最大输出 Token：`640`
+- 快速模式默认开启
+- OpenRouter 请求固定启用 `allow_fallbacks: true` 与 `sort: "latency"`
+- 对 408、425、429、500、502、503、504 及瞬时网络错误最多自动重试一次
+- 默认附加 `X-OpenRouter-Title: Prompt Professionalizer`
+
+> OpenRouter 仍需要用户填写自己的 API Key。已有自定义模型配置不会被强制覆盖；仅未填写 API Key 且仍保持旧内置 OpenAI 默认值的配置会自动迁移。
+
 Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，将口语化输入一键改写为专业、明确、可执行的提示词。
 
 ## v0.6.0 模块级自定义与保存
@@ -29,14 +44,16 @@ Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，
 
 ## 默认配置
 
-- Base URL：`https://api.openai.com/v1`
+- Base URL：`https://openrouter.ai/api/v1`
+- 模型：`openrouter/free`
 - 接口路径：`/chat/completions`
-- Temperature：`0.3`
-- 请求超时：`6000` 毫秒
+- Temperature：`0.2`
+- 请求超时：`15000` 毫秒
 - 最大输入字符数：`9999`
+- 最大输出 Token：`640`
 - 默认模板：仅保留“专业化表达”一个模板
 
-每个模型配置分别保存接口路径、Temperature、请求超时和最大输入字符数。
+每个模型配置分别保存接口路径、Temperature、请求超时、输入上限和输出上限。
 
 ## 支持站点
 
@@ -55,8 +72,8 @@ Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，
 2. 开启“开发者模式”。
 3. 点击“加载已解压的扩展程序”。
 4. 选择 `prompt-professionalizer/` 目录。
-5. 打开扩展设置，填写 Base URL、API Key 和模型名称。
-6. 点击“验证接口”。
+5. 打开扩展设置，填写 OpenRouter API Key。
+6. 保持默认模型 `openrouter/free`，点击“验证接口”。
 7. 刷新 AI 对话页面。
 
 ## 按钮操作
@@ -94,7 +111,7 @@ Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，
 - 修复 P 拖到输入框外后，打字触发默认定位与自定义定位反复争抢造成的闪烁。
 - 自定义位置启用后，基础输入框定位器不再改写 P 的坐标。
 - 移除每次 input 事件触发的重新定位；DOM 观察器仅在原编辑器失效时重新查找。
-- 模型配置新增快速模式和最大输出 Token，默认 1200。
+- 模型配置新增快速模式和最大输出 Token。
 - 快速模式按输入长度动态限制输出，并要求模型直接、简洁地返回改写结果。
 - 相同模型、模板和输入在 5 分钟内重复调用命中内存缓存。
 - 请求完成提示显示耗时，便于区分插件开销与模型端延迟。
@@ -102,9 +119,9 @@ Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，
 ## v0.7.0 模型接口兼容修复
 
 - 修复验证接口固定限制 32 Token，导致 GPT-5、o1、o3、o4 等推理模型返回空 `content` 的误报。
-- 验证请求会自动移除短输出限制，并转换为仅含用户消息的最小请求。
-- 支持 `message.content` 字符串或数组、OpenAI Responses API、Anthropic、Gemini、Ollama 以及嵌套 `data` 返回结构。
-- 支持服务端忽略 `stream:false` 时返回的 SSE `data:` 流，以及纯文本响应。
-- 检测到只有 `reasoning_content` 时会明确报错，不会把内部推理当成最终答案。
-- 接口 HTTP 成功但无文本时，错误信息会显示 `finish_reason`、响应字段和安全截断后的响应片段。
+- 验证请求不再施加短输出上限，并使用仅含用户消息的最小请求，提高兼容性。
+- 支持 `message.content` 字符串或数组、OpenAI Responses API、Anthropic、Gemini、Ollama 以及嵌套 `data` 返回结构；检测到只有 `reasoning_content` 时会明确报错，不会把内部推理当成最终答案。
+- 支持服务端忽略 `stream:false` 时返回的 SSE `data:` 流。
+- 支持纯文本响应。
+- 接口 HTTP 成功但无文本时，错误信息会显示 `finish_reason`、响应字段和安全截断后的响应片段，便于定位。
 - 实际使用推理模型时，快速模式最低输出预算提高到 512 Token，避免推理预算耗尽后没有最终文本。
