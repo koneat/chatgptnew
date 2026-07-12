@@ -5,7 +5,7 @@
 - 默认 Base URL：`https://openrouter.ai/api/v1`
 - 默认模型：`openrouter/free`
 - 默认接口路径：`/chat/completions`
-- Temperature：`0.2`
+- Temperature：`0.1`
 - 请求超时：`15000` 毫秒
 - 最大输出 Token：`640`
 - 快速模式默认开启
@@ -16,6 +16,15 @@
 > OpenRouter 仍需要用户填写自己的 API Key。已有自定义模型配置不会被强制覆盖；仅未填写 API Key 且仍保持旧内置 OpenAI 默认值的配置会自动迁移。
 
 Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，将口语化输入一键改写为专业、明确、可执行的提示词。
+
+## v0.9.0 中文输出与 @ 原样保护
+
+- 最终优化结果必须使用简体中文。
+- `@账号`、`@工具`、邮箱等包含 `@` 的片段会在请求前转换为受保护占位符，返回后逐字恢复。
+- 每个占位符必须恰好出现一次；缺失、重复、改写或非中文结果不会覆盖输入框。
+- 首次输出不合格时自动使用更严格规则重试一次。
+- 实际请求固定使用 Temperature `0.1`，降低免费模型路由带来的随机性。
+- 这些属于内置不可覆盖规则，即使用户自定义系统提示词也始终生效。
 
 ## v0.6.0 模块级自定义与保存
 
@@ -47,13 +56,13 @@ Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，
 - Base URL：`https://openrouter.ai/api/v1`
 - 模型：`openrouter/free`
 - 接口路径：`/chat/completions`
-- Temperature：`0.2`
+- Temperature：`0.1`
 - 请求超时：`15000` 毫秒
 - 最大输入字符数：`9999`
 - 最大输出 Token：`640`
 - 默认模板：仅保留“专业化表达”一个模板
 
-每个模型配置分别保存接口路径、Temperature、请求超时、输入上限和输出上限。
+每个模型配置分别保存接口路径、Temperature、请求超时和最大输入字符数。
 
 ## 支持站点
 
@@ -72,8 +81,8 @@ Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，
 2. 开启“开发者模式”。
 3. 点击“加载已解压的扩展程序”。
 4. 选择 `prompt-professionalizer/` 目录。
-5. 打开扩展设置，填写 OpenRouter API Key。
-6. 保持默认模型 `openrouter/free`，点击“验证接口”。
+5. 打开扩展设置，填写 Base URL、API Key 和模型名称。
+6. 点击“验证接口”。
 7. 刷新 AI 对话页面。
 
 ## 按钮操作
@@ -111,7 +120,7 @@ Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，
 - 修复 P 拖到输入框外后，打字触发默认定位与自定义定位反复争抢造成的闪烁。
 - 自定义位置启用后，基础输入框定位器不再改写 P 的坐标。
 - 移除每次 input 事件触发的重新定位；DOM 观察器仅在原编辑器失效时重新查找。
-- 模型配置新增快速模式和最大输出 Token。
+- 模型配置新增快速模式和最大输出 Token，默认 1200。
 - 快速模式按输入长度动态限制输出，并要求模型直接、简洁地返回改写结果。
 - 相同模型、模板和输入在 5 分钟内重复调用命中内存缓存。
 - 请求完成提示显示耗时，便于区分插件开销与模型端延迟。
