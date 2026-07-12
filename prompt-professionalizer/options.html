@@ -64,13 +64,13 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
         <label>模型名称<input id="provider-model" list="model-list" placeholder="openrouter/free"><datalist id="model-list"></datalist></label>
         <label>Base URL<input id="provider-base-url" placeholder="https://openrouter.ai/api/v1"></label>
         <label>接口路径<input id="provider-path" placeholder="/chat/completions"></label>
-        <label class="span-two">API Key<div class="secret-row"><input id="provider-api-key" type="password" autocomplete="off" placeholder="填写 OpenRouter API Key"><button id="toggle-key" type="button">显示</button></div></label>
+        <label class="span-two">API Key<div class="secret-row"><input id="provider-api-key" type="password" autocomplete="off" placeholder="允许留空，用于本地无鉴权接口"><button id="toggle-key" type="button">显示</button></div></label>
         <label>Temperature<input id="provider-temperature" type="number" min="0" max="2" step="0.1"></label>
         <label>请求超时（毫秒）<input id="provider-timeout-ms" type="number" min="1000" max="180000" step="1000"></label>
         <label>最大输入字符数<input id="provider-max-input-chars" type="number" min="100" max="100000" step="100"></label>
         <label>最大输出 Token<input id="provider-max-output-tokens" type="number" min="32" max="16384" step="32"></label>
         <label class="checkbox"><input id="provider-fast-mode" type="checkbox">快速模式（限制输出长度，减少等待）</label>
-        <label>附加请求头 JSON<input id="provider-headers" placeholder='{"X-OpenRouter-Title":"Prompt Professionalizer"}'></label>
+        <label>附加请求头 JSON<input id="provider-headers" placeholder='{"HTTP-Referer":"https://example.com"}'></label>
       </div>
       <div class="actions footer-actions"><button id="fetch-models">拉取模型列表</button><button id="test-provider">验证接口</button><span id="provider-status" class="status"></span></div>
     </section>
@@ -86,7 +86,7 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
 
     <section class="card">
       <div class="section-head">
-        <div><h2>全局提示词规则</h2><p>系统提示词可完全自定义，并作为所有优化模板共同使用的基础规则。</p></div>
+        <div><h2>全局提示词规则</h2><p>系统提示词可完全自定义。内置强制规则始终生效：最终必须输出简体中文，所有包含 @ 的标识、账号与邮箱必须逐字原样保留。</p></div>
         <button id="save-global-prompt" class="primary">保存系统提示词</button>
       </div>
       <label>系统提示词<textarea id="global-system-prompt" rows="7" placeholder="输入所有模板共同遵循的系统规则"></textarea></label>
