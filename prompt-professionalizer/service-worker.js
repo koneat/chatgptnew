@@ -250,7 +250,12 @@ function buildEndpoint(baseUrl, path) {
   const base = String(baseUrl || "").trim().replace(/\/+$/, "");
   if (!base) throw new Error("Base URL 不能为空");
   if (/\/chat\/completions$/i.test(base)) return base;
-  return `${base}/${String(path || "/v1/chat/completions").replace(/^\/+/, "")}`;
+
+  let normalizedPath = String(path || "/v1/chat/completions").replace(/^\/+/, "");
+  if (/\/v1$/i.test(base) && /^v1\//i.test(normalizedPath)) {
+    normalizedPath = normalizedPath.replace(/^v1\//i, "");
+  }
+  return `${base}/${normalizedPath}`;
 }
 
 function parseExtraHeaders(raw) {
