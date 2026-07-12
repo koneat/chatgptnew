@@ -1,11 +1,9 @@
 const STORAGE_KEY = "promptProfessionalizerSettings";
 
 const DEFAULT_SETTINGS = {
-  version: 2,
+  version: 3,
   activeProviderId: "default-openai-compatible",
   defaultTemplateId: "professional",
-  timeoutMs: 60000,
-  maxInputChars: 30000,
   globalSystemPrompt: [
     "你是一名资深提示词工程师。",
     "你的任务是重写用户输入，使其意图明确、上下文充分、约束完整、输出要求可执行。",
@@ -16,11 +14,13 @@ const DEFAULT_SETTINGS = {
     {
       id: "default-openai-compatible",
       name: "OpenAI 兼容接口",
-      baseUrl: "https://api.openai.com",
-      path: "/v1/chat/completions",
+      baseUrl: "https://api.openai.com/v1",
+      path: "/chat/completions",
       apiKey: "",
       model: "gpt-4.1-mini",
-      temperature: 0.2,
+      temperature: 0.3,
+      timeoutMs: 6000,
+      maxInputChars: 9999,
       extraHeaders: "{}"
     }
   ],
@@ -29,21 +29,6 @@ const DEFAULT_SETTINGS = {
       id: "professional",
       name: "专业化表达",
       instruction: "将口语化、大白话表达改写为专业、准确、无歧义的工程语言；补全必要的技术术语，但不要凭空增加事实。"
-    },
-    {
-      id: "structured",
-      name: "结构化增强",
-      instruction: "把输入整理为目标、背景、已知条件、约束、执行步骤、验收标准和期望输出格式；缺失信息使用明确的待确认项表示。"
-    },
-    {
-      id: "security",
-      name: "安全审计模式",
-      instruction: "以企业应用安全审计语境重写，突出资产、信任边界、权限模型、数据流、攻击前提、影响、验证逻辑、修复方案和检查清单；保持防御性，不生成破坏性操作。"
-    },
-    {
-      id: "concise",
-      name: "精简去歧义",
-      instruction: "删除重复和情绪化表述，保留关键目标、约束和验收条件，用尽可能少但足够明确的文字表达。"
     }
   ]
 };
@@ -104,14 +89,14 @@ async function handleMessage(message) {
       const settings = mergeSettings(await loadSettings());
       const text = String(message.text || "").trim();
       if (!text) throw new Error("当前输入框没有可优化的内容");
-      if (text.length > settings.maxInputChars) {
-        throw new Error(`输入过长，当前上限为 ${settings.maxInputChars} 个字符`);
+      const provider = resolveProvider(settings);
+      if (text.length > provider.maxInputChars) {
+        throw new Error(`输入过长，当前模型配置上限为 ${provider.maxInputChars} 个字符`);
       }
       const template = settings.templates.find((item) => item.id === message.templateId)
         || settings.templates.find((item) => item.id === settings.defaultTemplateId)
         || settings.templates[0];
       if (!template) throw new Error("未配置优化模板");
-      const provider = resolveProvider(settings);
       const enhancedText = await callOpenAICompatible({ settings, provider, template, text });
       return { enhancedText, templateName: template.name };
     }
@@ -119,8 +104,8 @@ async function handleMessage(message) {
       const provider = normalizeProvider(message.provider);
       const testSettings = mergeSettings(await loadSettings());
       const result = await callOpenAICompatible({
-        settings: { ...testSettings, timeoutMs: Math.min(testSettings.timeoutMs, 30000) },
-        provider,
+        settings: testSettings,
+        provider: { ...provider, timeoutMs: Math.min(provider.timeoutMs, 30000) },
         template: { instruction: "把下列文本原样输出，仅输出 OK。" },
         text: "OK"
       });
@@ -151,9 +136,9 @@ function resolveProvider(settings) {
 
 async function callOpenAICompatible({ settings, provider, template, text }) {
   validateProvider(provider);
-  const endpoint = buildEndpoint(provider.baseUrl, provider.path || "/v1/chat/completions");
+  const endpoint = buildEndpoint(provider.baseUrl, provider.path || "/chat/completions");
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Number(settings.timeoutMs) || 60000);
+  const timer = setTimeout(() => controller.abort(), Number(provider.timeoutMs) || 6000);
 
   try {
     const headers = {
@@ -167,7 +152,7 @@ async function callOpenAICompatible({ settings, provider, template, text }) {
       headers,
       body: JSON.stringify({
         model: provider.model,
-        temperature: clampNumber(provider.temperature, 0, 2, 0.2),
+        temperature: clampNumber(provider.temperature, 0, 2, 0.3),
         messages: [
           {
             role: "system",
@@ -244,7 +229,7 @@ function buildEndpoint(baseUrl, path) {
   if (!base) throw new Error("Base URL 不能为空");
   if (/\/chat\/completions$/i.test(base)) return base;
 
-  let normalizedPath = String(path || "/v1/chat/completions").replace(/^\/+/, "");
+  let normalizedPath = String(path || "/chat/completions").replace(/^\/+/, "");
   if (/\/v1$/i.test(base) && /^v1\//i.test(normalizedPath)) {
     normalizedPath = normalizedPath.replace(/^v1\//i, "");
   }
@@ -292,18 +277,36 @@ function validateProvider(provider, options = {}) {
   }
   if (!/^https?:$/.test(parsed.protocol)) throw new Error("Base URL 仅支持 HTTP/HTTPS");
   if (requireModel && !provider.model) throw new Error("模型名称不能为空");
+  if (provider.timeoutMs < 1000 || provider.timeoutMs > 180000) throw new Error("请求超时必须在 1000 到 180000 毫秒之间");
+  if (provider.maxInputChars < 100 || provider.maxInputChars > 100000) throw new Error("最大输入字符数必须在 100 到 100000 之间");
   parseExtraHeaders(provider.extraHeaders);
 }
 
-function normalizeProvider(provider) {
+function normalizeProvider(provider, migration = {}) {
+  const sourceVersion = Number(migration.sourceVersion || 3);
+  const rawBaseUrl = String(provider?.baseUrl || "").trim();
+  const rawPath = String(provider?.path || "").trim();
+  const wasOldOpenAIDefault = sourceVersion < 3
+    && rawBaseUrl === "https://api.openai.com"
+    && (!rawPath || rawPath === "/v1/chat/completions");
+
+  const legacyTimeout = Number(migration.legacyTimeoutMs);
+  const legacyMaxInput = Number(migration.legacyMaxInputChars);
+  const migratedTimeout = sourceVersion < 3 && legacyTimeout === 60000 ? 6000 : legacyTimeout;
+  const migratedMaxInput = sourceVersion < 3 && legacyMaxInput === 30000 ? 9999 : legacyMaxInput;
+  const rawTemperature = Number(provider?.temperature);
+  const migratedTemperature = sourceVersion < 3 && rawTemperature === 0.2 ? 0.3 : rawTemperature;
+
   return {
     id: String(provider?.id || crypto.randomUUID()),
     name: String(provider?.name || "自定义接口"),
-    baseUrl: String(provider?.baseUrl || "").trim(),
-    path: String(provider?.path || "/v1/chat/completions").trim(),
+    baseUrl: wasOldOpenAIDefault ? "https://api.openai.com/v1" : rawBaseUrl,
+    path: wasOldOpenAIDefault ? "/chat/completions" : (rawPath || "/chat/completions"),
     apiKey: String(provider?.apiKey || "").trim(),
     model: String(provider?.model || "").trim(),
-    temperature: clampNumber(provider?.temperature, 0, 2, 0.2),
+    temperature: clampNumber(migratedTemperature, 0, 2, 0.3),
+    timeoutMs: clampNumber(provider?.timeoutMs ?? migratedTimeout, 1000, 180000, 6000),
+    maxInputChars: clampNumber(provider?.maxInputChars ?? migratedMaxInput, 100, 100000, 9999),
     extraHeaders: typeof provider?.extraHeaders === "string"
       ? provider.extraHeaders
       : JSON.stringify(provider?.extraHeaders || {}, null, 2)
@@ -314,10 +317,14 @@ function mergeSettings(input = {}) {
   const merged = {
     ...DEFAULT_SETTINGS,
     ...input,
-    version: 2,
+    version: 3,
     providers: Array.isArray(input.providers) && input.providers.length
-      ? input.providers.map(normalizeProvider)
-      : DEFAULT_SETTINGS.providers.map(normalizeProvider),
+      ? input.providers.map((provider) => normalizeProvider(provider, {
+          sourceVersion: Number(input.version || 1),
+          legacyTimeoutMs: input.timeoutMs,
+          legacyMaxInputChars: input.maxInputChars
+        }))
+      : DEFAULT_SETTINGS.providers.map((provider) => normalizeProvider(provider)),
     templates: Array.isArray(input.templates) && input.templates.length
       ? input.templates.map((template) => ({
           id: String(template.id || crypto.randomUUID()),
@@ -333,8 +340,8 @@ function mergeSettings(input = {}) {
   if (!merged.templates.some((item) => item.id === merged.defaultTemplateId)) {
     merged.defaultTemplateId = merged.templates[0]?.id || "";
   }
-  merged.timeoutMs = clampNumber(merged.timeoutMs, 5000, 180000, 60000);
-  merged.maxInputChars = clampNumber(merged.maxInputChars, 100, 100000, 30000);
+  delete merged.timeoutMs;
+  delete merged.maxInputChars;
   delete merged.showPreview;
   return merged;
 }
