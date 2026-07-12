@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Prompt Professionalizer",
-  "version": "0.2.0",
-  "description": "在 AI 对话框侧边单击即可专业化并替换提示词，支持自定义 OpenAI 兼容模型与持久化模板。",
+  "version": "0.3.0",
+  "description": "在 ChatGPT、Claude、Gemini 输入框末端显示绿色 P 按钮，一键专业化并直接替换提示词。",
   "permissions": [
     "storage",
     "contextMenus"
