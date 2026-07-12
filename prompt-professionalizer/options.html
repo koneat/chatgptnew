@@ -45,14 +45,14 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
     <header>
       <div>
         <h1>Prompt Professionalizer</h1>
-        <p>在 AI 对话框末端单击绿色 P，即可优化并直接替换输入内容。</p>
+        <p>在 AI 对话框侧边单击当前模板，即可优化并直接替换输入内容。</p>
       </div>
       <button id="save-all" class="primary">保存全部设置</button>
     </header>
 
     <section class="card">
       <div class="section-head">
-        <div><h2>模型接口</h2><p>请求超时、最大输入字符数与当前模型配置一起保存；API Key 仅保存在本机。</p></div>
+        <div><h2>模型接口</h2><p>模板统一使用当前模型；验证成功或实际调用成功后，输入框中的 P 才会变绿。</p></div>
         <div class="actions"><button id="add-provider">新增模型</button><button id="delete-provider" class="danger">删除当前模型</button></div>
       </div>
 
@@ -73,7 +73,7 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
 
     <section class="card">
       <div class="section-head">
-        <div><h2>优化模板</h2><p>默认只保留一个模板；需要其他模式时自行添加。右键 P 可切换默认模板。</p></div>
+        <div><h2>优化模板</h2><p>侧边菜单选择一次后会立即保存为默认模式，后续单击按钮持续使用该模板。</p></div>
         <button id="add-template">新增模板</button>
       </div>
       <label>默认模板<select id="default-template"></select></label>
