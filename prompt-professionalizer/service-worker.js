@@ -1,8 +1,8 @@
 const STORAGE_KEY = "promptProfessionalizerSettings";
 
 const DEFAULT_SETTINGS = {
-  version: 4,
-  activeProviderId: "default-openai-compatible",
+  version: 5,
+  activeProviderId: "default-openrouter-free",
   defaultTemplateId: "professional",
   globalSystemPrompt: [
     "你是一名资深提示词工程师。",
@@ -12,18 +12,18 @@ const DEFAULT_SETTINGS = {
   ].join("\n"),
   providers: [
     {
-      id: "default-openai-compatible",
-      name: "OpenAI 兼容接口",
-      baseUrl: "https://api.openai.com/v1",
+      id: "default-openrouter-free",
+      name: "OpenRouter Free",
+      baseUrl: "https://openrouter.ai/api/v1",
       path: "/chat/completions",
       apiKey: "",
-      model: "gpt-4.1-mini",
-      temperature: 0.3,
-      timeoutMs: 6000,
+      model: "openrouter/free",
+      temperature: 0.2,
+      timeoutMs: 15000,
       maxInputChars: 9999,
       fastMode: true,
-      maxOutputTokens: 1200,
-      extraHeaders: "{}"
+      maxOutputTokens: 640,
+      extraHeaders: '{"X-OpenRouter-Title":"Prompt Professionalizer"}'
     }
   ],
   templates: [
@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS = {
 
 const SETTINGS_CACHE_TTL_MS = 30000;
 const RESPONSE_CACHE_TTL_MS = 5 * 60 * 1000;
+const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 let settingsCache = null;
 let settingsCacheAt = 0;
 const responseCache = new Map();
@@ -168,7 +169,7 @@ async function callOpenAICompatible({ settings, provider, template, text, disabl
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Number(provider.timeoutMs) || 6000);
+  const timer = setTimeout(() => controller.abort(), Number(provider.timeoutMs) || 15000);
   const startedAt = performance.now();
 
   try {
@@ -180,8 +181,7 @@ async function callOpenAICompatible({ settings, provider, template, text, disabl
 
     const requestBody = {
       model: provider.model,
-      temperature: clampNumber(provider.temperature, 0, 2, 0.3),
-      n: 1,
+      temperature: clampNumber(provider.temperature, 0, 2, 0.2),
       stream: false,
       messages: [
         {
@@ -195,8 +195,9 @@ async function callOpenAICompatible({ settings, provider, template, text, disabl
       ]
     };
     applyFastGenerationLimit(requestBody, provider, text);
+    applyProviderRouting(requestBody, provider);
 
-    const response = await fetch(endpoint, {
+    const response = await fetchWithTransientRetry(endpoint, {
       method: "POST",
       headers,
       body: JSON.stringify(requestBody),
@@ -322,12 +323,22 @@ function validateProvider(provider, options = {}) {
 }
 
 function normalizeProvider(provider, migration = {}) {
-  const sourceVersion = Number(migration.sourceVersion || 3);
+  const sourceVersion = Number(migration.sourceVersion || 5);
   const rawBaseUrl = String(provider?.baseUrl || "").trim();
   const rawPath = String(provider?.path || "").trim();
-  const wasOldOpenAIDefault = sourceVersion < 3
+  const rawApiKey = String(provider?.apiKey || "").trim();
+  const rawModel = String(provider?.model || "").trim();
+  const wasLegacyOpenAIBase = sourceVersion < 3
     && rawBaseUrl === "https://api.openai.com"
     && (!rawPath || rawPath === "/v1/chat/completions");
+  const normalizedLegacyBase = wasLegacyOpenAIBase ? "https://api.openai.com/v1" : rawBaseUrl;
+  const normalizedLegacyPath = wasLegacyOpenAIBase ? "/chat/completions" : (rawPath || "/chat/completions");
+  const migrateBundledDefault = sourceVersion < 5
+    && !rawApiKey
+    && normalizedLegacyBase === "https://api.openai.com/v1"
+    && normalizedLegacyPath === "/chat/completions"
+    && (!rawModel || rawModel === "gpt-4.1-mini")
+    && ["", "OpenAI 兼容接口", "自定义接口"].includes(String(provider?.name || ""));
 
   const legacyTimeout = Number(migration.legacyTimeoutMs);
   const legacyMaxInput = Number(migration.legacyMaxInputChars);
@@ -338,19 +349,21 @@ function normalizeProvider(provider, migration = {}) {
 
   return {
     id: String(provider?.id || crypto.randomUUID()),
-    name: String(provider?.name || "自定义接口"),
-    baseUrl: wasOldOpenAIDefault ? "https://api.openai.com/v1" : rawBaseUrl,
-    path: wasOldOpenAIDefault ? "/chat/completions" : (rawPath || "/chat/completions"),
-    apiKey: String(provider?.apiKey || "").trim(),
-    model: String(provider?.model || "").trim(),
-    temperature: clampNumber(migratedTemperature, 0, 2, 0.3),
-    timeoutMs: clampNumber(provider?.timeoutMs ?? migratedTimeout, 1000, 180000, 6000),
+    name: migrateBundledDefault ? "OpenRouter Free" : String(provider?.name || "自定义接口"),
+    baseUrl: migrateBundledDefault ? "https://openrouter.ai/api/v1" : normalizedLegacyBase,
+    path: normalizedLegacyPath,
+    apiKey: rawApiKey,
+    model: migrateBundledDefault ? "openrouter/free" : rawModel,
+    temperature: migrateBundledDefault ? 0.2 : clampNumber(migratedTemperature, 0, 2, 0.2),
+    timeoutMs: migrateBundledDefault ? 15000 : clampNumber(provider?.timeoutMs ?? migratedTimeout, 1000, 180000, 15000),
     maxInputChars: clampNumber(provider?.maxInputChars ?? migratedMaxInput, 100, 100000, 9999),
     fastMode: provider?.fastMode !== false,
-    maxOutputTokens: clampNumber(provider?.maxOutputTokens, 32, 16384, 1200),
-    extraHeaders: typeof provider?.extraHeaders === "string"
-      ? provider.extraHeaders
-      : JSON.stringify(provider?.extraHeaders || {}, null, 2)
+    maxOutputTokens: migrateBundledDefault ? 640 : clampNumber(provider?.maxOutputTokens, 32, 16384, 640),
+    extraHeaders: migrateBundledDefault
+      ? '{"X-OpenRouter-Title":"Prompt Professionalizer"}'
+      : (typeof provider?.extraHeaders === "string"
+          ? provider.extraHeaders
+          : JSON.stringify(provider?.extraHeaders || {}, null, 2))
   };
 }
 
@@ -362,11 +375,57 @@ function buildSystemPrompt(globalPrompt, instruction, fastMode) {
 
 function applyFastGenerationLimit(body, provider, text) {
   if (provider.fastMode === false) return;
-  const configured = clampNumber(provider.maxOutputTokens, 32, 16384, 1200);
+  const configured = clampNumber(provider.maxOutputTokens, 32, 16384, 640);
   const dynamic = Math.min(configured, Math.max(192, Math.ceil(String(text || "").length * 1.35)));
   const model = String(provider.model || "").toLowerCase();
   if (/^(o1|o3|o4)|gpt-5/.test(model)) body.max_completion_tokens = dynamic;
   else body.max_tokens = dynamic;
+}
+
+function applyProviderRouting(body, provider) {
+  try {
+    const endpoint = new URL(provider.baseUrl);
+    if (endpoint.hostname !== "openrouter.ai") return;
+    body.provider = {
+      allow_fallbacks: true,
+      sort: "latency"
+    };
+  } catch {}
+}
+
+async function fetchWithTransientRetry(endpoint, options) {
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(endpoint, options);
+      if (!TRANSIENT_HTTP_STATUSES.has(response.status) || attempt === 1) return response;
+      const retryAfterSeconds = Number(response.headers.get("retry-after"));
+      const delayMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? Math.min(1000, retryAfterSeconds * 1000)
+        : 250 + Math.floor(Math.random() * 151);
+      await delayWithSignal(delayMs, options.signal);
+    } catch (error) {
+      if (error?.name === "AbortError" || attempt === 1) throw error;
+      lastError = error;
+      await delayWithSignal(250 + Math.floor(Math.random() * 151), options.signal);
+    }
+  }
+  throw lastError || new Error("模型接口请求失败");
+}
+
+function delayWithSignal(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function buildResponseCacheKey(provider, template, text) {
@@ -405,7 +464,7 @@ function mergeSettings(input = {}) {
   const merged = {
     ...DEFAULT_SETTINGS,
     ...input,
-    version: 4,
+    version: 5,
     providers: Array.isArray(input.providers) && input.providers.length
       ? input.providers.map((provider) => normalizeProvider(provider, {
           sourceVersion: Number(input.version || 1),
