@@ -60,6 +60,8 @@ function renderProviderForm() {
   $("#provider-temperature").value = provider.temperature ?? 0.3;
   $("#provider-timeout-ms").value = provider.timeoutMs ?? 6000;
   $("#provider-max-input-chars").value = provider.maxInputChars ?? 9999;
+  $("#provider-max-output-tokens").value = provider.maxOutputTokens ?? 1200;
+  $("#provider-fast-mode").checked = provider.fastMode !== false;
   $("#provider-headers").value = provider.extraHeaders || "{}";
   if (provider.health?.ok) {
     const checkedAt = provider.health.checkedAt ? new Date(provider.health.checkedAt).toLocaleString() : "";
@@ -81,6 +83,8 @@ function persistProviderForm() {
   provider.temperature = Number($("#provider-temperature").value || 0.3);
   provider.timeoutMs = Number($("#provider-timeout-ms").value || 6000);
   provider.maxInputChars = Number($("#provider-max-input-chars").value || 9999);
+  provider.maxOutputTokens = Number($("#provider-max-output-tokens").value || 1200);
+  provider.fastMode = $("#provider-fast-mode").checked;
   provider.extraHeaders = $("#provider-headers").value.trim() || "{}";
   if (before !== providerConfigSnapshot(provider)) delete provider.health;
 }
@@ -98,6 +102,8 @@ function addProvider() {
     temperature: 0.3,
     timeoutMs: 6000,
     maxInputChars: 9999,
+    maxOutputTokens: 1200,
+    fastMode: true,
     extraHeaders: "{}",
     health: { ok: false, checkedAt: 0, signature: "", error: "模型尚未验证" }
   });
@@ -247,6 +253,8 @@ function providerConfigSnapshot(provider) {
     temperature: Number(provider?.temperature ?? 0.3),
     timeoutMs: Number(provider?.timeoutMs ?? 6000),
     maxInputChars: Number(provider?.maxInputChars ?? 9999),
+    fastMode: provider?.fastMode !== false,
+    maxOutputTokens: Number(provider?.maxOutputTokens ?? 1200),
     extraHeaders: provider?.extraHeaders || "{}"
   });
 }
