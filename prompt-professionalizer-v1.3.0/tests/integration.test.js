@@ -21,7 +21,9 @@ function createRuntime({ initialStorage = {}, fetchImpl } = {}) {
           const wanted = Array.isArray(keys) ? keys : [keys];
           return Object.fromEntries(wanted.filter((key) => key in storage).map((key) => [key, structuredClone(storage[key])]));
         },
-        async set(values) { Object.assign(storage, structuredClone(values)); }
+        async set(values) {
+          Object.assign(storage, structuredClone(values));
+        }
       },
       onChanged: { addListener(listener) { changedListeners.push(listener); } }
     },
@@ -30,11 +32,19 @@ function createRuntime({ initialStorage = {}, fetchImpl } = {}) {
       onMessage: { addListener(listener) { messageListener = listener; } },
       openOptionsPage() {}
     },
-    contextMenus: { removeAll(callback) { callback?.(); }, create() {}, onClicked: { addListener() {} } },
+    contextMenus: {
+      removeAll(callback) { callback?.(); },
+      create() {},
+      onClicked: { addListener() {} }
+    },
     action: { onClicked: { addListener() {} } },
     commands: { onCommand: { addListener() {} } },
-    tabs: { async query() { return []; }, sendMessage() { return Promise.resolve(); } }
+    tabs: {
+      async query() { return []; },
+      sendMessage() { return Promise.resolve(); }
+    }
   };
+
   const sandbox = {
     chrome,
     fetch: fetchImpl || (async () => { throw new Error("unexpected fetch"); }),
@@ -51,6 +61,7 @@ function createRuntime({ initialStorage = {}, fetchImpl } = {}) {
   };
   vm.createContext(sandbox);
   vm.runInContext(SOURCE, sandbox, { filename: "service-worker.js" });
+
   async function send(message) {
     assert.equal(typeof messageListener, "function", "message listener missing");
     return await new Promise((resolve, reject) => {
@@ -59,6 +70,7 @@ function createRuntime({ initialStorage = {}, fetchImpl } = {}) {
       setTimeout(() => reject(new Error("message timeout")), 2000).unref?.();
     });
   }
+
   return { send, storage, installed: () => installedListener?.() };
 }
 
@@ -104,6 +116,7 @@ async function testDefaultsAndSingleRequest() {
     assert.ok(result.enhancedText.includes(immutable), `missing immutable ${immutable}`);
   }
   assert.match(result.enhancedText, /不要/);
+
   const cached = await runtime.send({ action: "enhance-text", text: input });
   assert.equal(cached.ok, true);
   assert.equal(cached.cached, true);
@@ -112,11 +125,13 @@ async function testDefaultsAndSingleRequest() {
 
 async function testDynamicBudgets() {
   const budgets = [];
-  const runtime = createRuntime({ fetchImpl: async (_url, init) => {
-    const body = JSON.parse(init.body);
-    budgets.push(body.max_tokens);
-    return okJson(body.messages.at(-1).content);
-  } });
+  const runtime = createRuntime({
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      budgets.push(body.max_tokens);
+      return okJson(body.messages.at(-1).content);
+    }
+  });
   await runtime.send({ action: "enhance-text", text: "短句测试" });
   await runtime.send({ action: "enhance-text", text: "中".repeat(200) });
   await runtime.send({ action: "enhance-text", text: "长".repeat(700) });
