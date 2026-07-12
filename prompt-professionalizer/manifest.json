@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Prompt Professionalizer",
+  "version": "0.1.0",
+  "description": "在 AI 对话框中一键扩写、结构化并专业化提示词，支持自定义 OpenAI 兼容模型。",
+  "permissions": [
+    "storage",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://chat.deepseek.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://grok.com/*",
+    "https://www.perplexity.ai/*",
+    "https://poe.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Prompt Professionalizer（点击打开设置）"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://chat.deepseek.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://grok.com/*",
+        "https://www.perplexity.ai/*",
+        "https://poe.com/*"
+      ],
+      "js": [
+        "content-script.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "enhance-active-input": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+M",
+        "mac": "Command+Shift+M"
+      },
+      "description": "优化当前输入框中的提示词"
+    }
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "options_page": "options.html"
+}
