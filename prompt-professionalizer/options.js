@@ -57,10 +57,10 @@ function renderProviderForm() {
   $("#provider-base-url").value = provider.baseUrl || "";
   $("#provider-path").value = provider.path || "/chat/completions";
   $("#provider-api-key").value = provider.apiKey || "";
-  $("#provider-temperature").value = provider.temperature ?? 0.3;
-  $("#provider-timeout-ms").value = provider.timeoutMs ?? 6000;
+  $("#provider-temperature").value = provider.temperature ?? 0.2;
+  $("#provider-timeout-ms").value = provider.timeoutMs ?? 15000;
   $("#provider-max-input-chars").value = provider.maxInputChars ?? 9999;
-  $("#provider-max-output-tokens").value = provider.maxOutputTokens ?? 1200;
+  $("#provider-max-output-tokens").value = provider.maxOutputTokens ?? 640;
   $("#provider-fast-mode").checked = provider.fastMode !== false;
   $("#provider-headers").value = provider.extraHeaders || "{}";
   if (provider.health?.ok) {
@@ -80,10 +80,10 @@ function persistProviderForm() {
   provider.baseUrl = $("#provider-base-url").value.trim();
   provider.path = $("#provider-path").value.trim() || "/chat/completions";
   provider.apiKey = $("#provider-api-key").value.trim();
-  provider.temperature = Number($("#provider-temperature").value || 0.3);
-  provider.timeoutMs = Number($("#provider-timeout-ms").value || 6000);
+  provider.temperature = Number($("#provider-temperature").value || 0.2);
+  provider.timeoutMs = Number($("#provider-timeout-ms").value || 15000);
   provider.maxInputChars = Number($("#provider-max-input-chars").value || 9999);
-  provider.maxOutputTokens = Number($("#provider-max-output-tokens").value || 1200);
+  provider.maxOutputTokens = Number($("#provider-max-output-tokens").value || 640);
   provider.fastMode = $("#provider-fast-mode").checked;
   provider.extraHeaders = $("#provider-headers").value.trim() || "{}";
   if (before !== providerConfigSnapshot(provider)) delete provider.health;
@@ -94,17 +94,17 @@ function addProvider() {
   const id = crypto.randomUUID();
   settings.providers.push({
     id,
-    name: "新模型配置",
-    baseUrl: "https://api.openai.com/v1",
+    name: "OpenRouter Free",
+    baseUrl: "https://openrouter.ai/api/v1",
     path: "/chat/completions",
     apiKey: "",
-    model: "",
-    temperature: 0.3,
-    timeoutMs: 6000,
+    model: "openrouter/free",
+    temperature: 0.2,
+    timeoutMs: 15000,
     maxInputChars: 9999,
-    maxOutputTokens: 1200,
+    maxOutputTokens: 640,
     fastMode: true,
-    extraHeaders: "{}",
+    extraHeaders: '{"X-OpenRouter-Title":"Prompt Professionalizer"}',
     health: { ok: false, checkedAt: 0, signature: "", error: "模型尚未验证" }
   });
   activeProviderId = id;
@@ -250,11 +250,11 @@ function providerConfigSnapshot(provider) {
     path: provider?.path || "",
     apiKey: provider?.apiKey || "",
     model: provider?.model || "",
-    temperature: Number(provider?.temperature ?? 0.3),
-    timeoutMs: Number(provider?.timeoutMs ?? 6000),
+    temperature: Number(provider?.temperature ?? 0.2),
+    timeoutMs: Number(provider?.timeoutMs ?? 15000),
     maxInputChars: Number(provider?.maxInputChars ?? 9999),
     fastMode: provider?.fastMode !== false,
-    maxOutputTokens: Number(provider?.maxOutputTokens ?? 1200),
+    maxOutputTokens: Number(provider?.maxOutputTokens ?? 640),
     extraHeaders: provider?.extraHeaders || "{}"
   });
 }
