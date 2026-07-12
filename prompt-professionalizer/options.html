@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Prompt Professionalizer 设置</title>
   <style>
-:root { color-scheme: light dark; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:#0b1120; color:#e2e8f0; }
+:root { color-scheme:light dark; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:#0b1120; color:#e2e8f0; }
 * { box-sizing:border-box; }
 body { margin:0; background:linear-gradient(135deg,#0b1120,#111827 55%,#172554); min-height:100vh; }
 .layout { width:min(1080px,calc(100% - 32px)); margin:0 auto; padding:34px 0 60px; }
@@ -17,7 +17,6 @@ p { margin:0; color:#94a3b8; line-height:1.55; }
 .section-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
 .grid { display:grid; gap:14px; margin-top:14px; }
 .grid.two { grid-template-columns:1fr 1fr; }
-.grid.three { grid-template-columns:1fr 1fr 1fr; align-items:end; }
 .span-two { grid-column:span 2; }
 label { display:flex; flex-direction:column; gap:7px; color:#cbd5e1; font-size:13px; font-weight:600; }
 input,select,textarea { width:100%; border:1px solid #334155; border-radius:10px; padding:10px 11px; outline:none; background:#020617; color:#e2e8f0; font:13px/1.4 inherit; }
@@ -31,17 +30,14 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
 .footer-actions { margin-top:14px; }
 .secret-row { display:grid; grid-template-columns:1fr auto; gap:8px; }
 .template-list { display:grid; gap:12px; margin-top:14px; }
-.template-card { display:grid; grid-template-columns:80px 1fr 180px 180px auto; gap:10px; align-items:end; padding:14px; border:1px solid #2b3a50; border-radius:12px; background:#0b1220; }
+.template-card { display:grid; grid-template-columns:minmax(180px,260px) 1fr auto; gap:10px; align-items:end; padding:14px; border:1px solid #2b3a50; border-radius:12px; background:#0b1220; }
 .template-card .instruction { grid-column:1 / -2; }
 .template-card .delete { align-self:stretch; }
-.checkbox { flex-direction:row; align-items:center; padding:10px 0; }
-.checkbox input { width:auto; }
 .status { color:#93c5fd; font-size:13px; }
 .save-status { position:fixed; right:22px; bottom:22px; min-width:180px; max-width:360px; padding:11px 14px; border-radius:10px; background:#14532d; color:#fff; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; }
 .save-status.show { opacity:1; transform:none; }
 .save-status.error { background:#7f1d1d; }
-@media (max-width:850px) { .grid.two,.grid.three { grid-template-columns:1fr; } .span-two { grid-column:auto; } .template-card { grid-template-columns:70px 1fr; } .template-card .instruction,.template-card .delete { grid-column:1 / -1; } header,.section-head { flex-direction:column; } }
-
+@media (max-width:850px) { .grid.two { grid-template-columns:1fr; } .span-two { grid-column:auto; } .template-card { grid-template-columns:1fr auto; } .template-card .instruction { grid-column:1 / -1; } header,.section-head { flex-direction:column; } }
   </style>
 </head>
 <body>
@@ -49,14 +45,14 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
     <header>
       <div>
         <h1>Prompt Professionalizer</h1>
-        <p>自定义 OpenAI 兼容模型，把口语化输入增强为专业、结构化、可执行的提示词。</p>
+        <p>在 AI 对话框侧边单击当前模板，即可优化并直接替换输入内容。</p>
       </div>
       <button id="save-all" class="primary">保存全部设置</button>
     </header>
 
     <section class="card">
       <div class="section-head">
-        <div><h2>模型接口</h2><p>API Key 仅保存在本机 Chrome 扩展存储中。</p></div>
+        <div><h2>模型接口</h2><p>模板统一使用当前模型；API Key 仅保存在本机 Chrome 扩展存储中。</p></div>
         <div class="actions"><button id="add-provider">新增模型</button><button id="delete-provider" class="danger">删除当前模型</button></div>
       </div>
 
@@ -75,7 +71,7 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
 
     <section class="card">
       <div class="section-head">
-        <div><h2>优化模板</h2><p>每个模板可以指定独立模型；留空时使用当前模型配置。</p></div>
+        <div><h2>优化模板</h2><p>侧边菜单选择一次后会立即保存为默认模式，后续单击按钮持续使用该模板。</p></div>
         <button id="add-template">新增模板</button>
       </div>
       <label>默认模板<select id="default-template"></select></label>
@@ -85,10 +81,9 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
     <section class="card">
       <h2>通用策略</h2>
       <label>系统提示词<textarea id="global-system-prompt" rows="7"></textarea></label>
-      <div class="grid three">
+      <div class="grid two">
         <label>请求超时（毫秒）<input id="timeout-ms" type="number" min="5000" max="180000" step="1000"></label>
         <label>最大输入字符数<input id="max-input-chars" type="number" min="100" max="100000" step="100"></label>
-        <label class="checkbox"><input id="show-preview" type="checkbox">替换前显示预览</label>
       </div>
     </section>
 
