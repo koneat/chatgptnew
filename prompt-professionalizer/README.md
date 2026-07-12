@@ -98,3 +98,13 @@ Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，
 - 快速模式按输入长度动态限制输出，并要求模型直接、简洁地返回改写结果。
 - 相同模型、模板和输入在 5 分钟内重复调用命中内存缓存。
 - 请求完成提示显示耗时，便于区分插件开销与模型端延迟。
+
+## v0.7.0 模型接口兼容修复
+
+- 修复验证接口固定限制 32 Token，导致 GPT-5、o1、o3、o4 等推理模型返回空 `content` 的误报。
+- 验证请求会自动移除短输出限制，并转换为仅含用户消息的最小请求。
+- 支持 `message.content` 字符串或数组、OpenAI Responses API、Anthropic、Gemini、Ollama 以及嵌套 `data` 返回结构。
+- 支持服务端忽略 `stream:false` 时返回的 SSE `data:` 流，以及纯文本响应。
+- 检测到只有 `reasoning_content` 时会明确报错，不会把内部推理当成最终答案。
+- 接口 HTTP 成功但无文本时，错误信息会显示 `finish_reason`、响应字段和安全截断后的响应片段。
+- 实际使用推理模型时，快速模式最低输出预算提高到 512 Token，避免推理预算耗尽后没有最终文本。
