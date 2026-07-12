@@ -1,50 +1,81 @@
 # Prompt Professionalizer
 
-Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框末端显示一个 `P` 按钮，把口语化输入一键改写为专业、结构化、无歧义的提示词，并直接替换原文。
+Manifest V3 Chrome 扩展：在 ChatGPT、Claude、Gemini 等 AI 对话框中，将口语化输入一键改写为专业、明确、可执行的提示词。
 
-## v0.3.0 交互
+## v0.4.0 交互
 
-- ChatGPT、Claude、Gemini 页面中，找到可编辑对话框后显示绿色圆形 `P`，绿色表示当前页面适配可用。
-- 左键 `P`：调用当前模型，完成后直接替换输入框。
-- 右键 `P`：打开模板菜单；选择后立即保存为默认模式。
-- `Shift + 左键 P` 也可打开模板菜单。
-- 默认只提供一个“专业化表达”模板，需要其他模式时在设置页自行添加。
+- 输入框显示单个圆形 `P` 按钮。
+- `P` 可以拖到浏览器可视区域内的任意位置；位置按网站分别保存。
+- 右键 `P` 可以选择模板或恢复默认位置。
+- 左键 `P` 直接优化并替换当前输入框内容。
+- 浏览器工具栏中的扩展图标：进入已支持网站时显示绿色，其他网站显示灰色。
+- 输入框中的 `P`：只有当前模型接口已验证可用时才显示绿色，否则显示灰色。
 
-## 默认模型配置
+为了避免页面加载时产生模型费用，扩展不会自动发送健康检查请求。以下任一操作成功后，输入框 `P` 会变绿：
+
+1. 在设置页点击“验证接口”并成功；
+2. 实际执行一次提示词优化并成功。
+
+配置改变或模型调用失败后，`P` 会恢复灰色。
+
+## 默认配置
 
 - Base URL：`https://api.openai.com/v1`
 - 接口路径：`/chat/completions`
 - Temperature：`0.3`
 - 请求超时：`6000` 毫秒
-- 最大输入：`9999` 字符
+- 最大输入字符数：`9999`
+- 默认模板：仅保留“专业化表达”一个模板
 
-请求超时和最大输入字符数属于每个模型配置，切换模型配置时会分别保存。
+每个模型配置分别保存接口路径、Temperature、请求超时和最大输入字符数。
 
-## 安装
+## 支持站点
 
-1. 解压扩展包。
-2. 打开 `chrome://extensions/`。
-3. 开启“开发者模式”。
-4. 点击“加载已解压的扩展程序”，选择 `prompt-professionalizer/`。
+- ChatGPT
+- Claude
+- Gemini
+- DeepSeek Chat
+- Microsoft Copilot
+- Grok
+- Perplexity
+- Poe
+
+## 使用
+
+1. 打开 `chrome://extensions/`。
+2. 开启“开发者模式”。
+3. 点击“加载已解压的扩展程序”。
+4. 选择 `prompt-professionalizer/` 目录。
 5. 打开扩展设置，填写 Base URL、API Key 和模型名称。
-6. 点击“验证接口”，刷新 ChatGPT、Claude 或 Gemini。
+6. 点击“验证接口”。
+7. 刷新 AI 对话页面。
 
-## OpenAI 兼容接口说明
+## 按钮操作
 
-扩展会把 Base URL 与接口路径拼接。例如：
+- 左键：优化并直接替换。
+- 拖动：移动按钮，松开后自动保存该网站的位置。
+- 右键：打开模板菜单。
+- `Shift + 左键`：打开模板菜单。
+- 菜单中的“恢复输入框默认位置”：取消当前网站的自定义位置。
+- `Ctrl/Command + Shift + M`：快捷优化当前输入框。
 
-```text
-Base URL: https://api.openai.com/v1
-Path:     /chat/completions
-最终地址: https://api.openai.com/v1/chat/completions
-```
+## 状态含义
 
-本地或代理接口可按实际路由修改 Base URL 与 Path。
+### 浏览器工具栏图标
+
+- 绿色：当前网站在扩展支持列表中。
+- 灰色：当前网站未适配。
+
+### 输入框 P
+
+- 绿色：当前选中的模型配置经过成功验证，或最近一次实际调用成功。
+- 灰色：未验证、配置已变化，或最近一次模型请求失败。
 
 ## 安全边界
 
-- 仅在用户点击 `P`、使用快捷键或右键菜单命令时读取并发送当前输入。
-- API Key 保存在 `chrome.storage.local`，网页 Content Script 无法读取。
-- 不处理密码框、只读框和禁用输入框。
-- 附加请求头过滤 `Host`、`Content-Length`、`Origin`、`Referer`、`Cookie`。
-- 模型结果直接替换原文，重要内容请先复制备份。
+- API Key 仅保存在 `chrome.storage.local`。
+- 页面 Content Script 无法读取 API Key。
+- 仅在用户主动点击、快捷键或右键菜单触发时发送输入内容。
+- 不处理密码框、只读框、禁用输入框。
+- 附加请求头会过滤 `Host`、`Content-Length`、`Origin`、`Referer`、`Cookie`。
+- 模型输出直接覆盖原输入，重要内容建议先复制备份。
