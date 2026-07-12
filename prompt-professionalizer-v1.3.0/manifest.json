@@ -39,8 +39,7 @@
         "https://poe.com/*"
       ],
       "js": [
-        "content-script.js",
-        "content-status.js"
+        "content-script.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
