@@ -19,7 +19,7 @@
     "https://poe.com/*"
   ],
   "background": {
-    "service_worker": "service-worker.js",
+    "service_worker": "service-worker-v4.js",
     "type": "module"
   },
   "action": {
@@ -38,7 +38,8 @@
         "https://poe.com/*"
       ],
       "js": [
-        "content-script.js"
+        "content-script.js",
+        "content-status.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
