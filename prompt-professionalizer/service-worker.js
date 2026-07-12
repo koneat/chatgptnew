@@ -1,7 +1,7 @@
 const STORAGE_KEY = "promptProfessionalizerSettings";
 
 const DEFAULT_SETTINGS = {
-  version: 3,
+  version: 4,
   activeProviderId: "default-openai-compatible",
   defaultTemplateId: "professional",
   globalSystemPrompt: [
@@ -21,6 +21,8 @@ const DEFAULT_SETTINGS = {
       temperature: 0.3,
       timeoutMs: 6000,
       maxInputChars: 9999,
+      fastMode: true,
+      maxOutputTokens: 1200,
       extraHeaders: "{}"
     }
   ],
@@ -32,6 +34,20 @@ const DEFAULT_SETTINGS = {
     }
   ]
 };
+
+const SETTINGS_CACHE_TTL_MS = 30000;
+const RESPONSE_CACHE_TTL_MS = 5 * 60 * 1000;
+let settingsCache = null;
+let settingsCacheAt = 0;
+const responseCache = new Map();
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && changes[STORAGE_KEY]) {
+    settingsCache = null;
+    settingsCacheAt = 0;
+    responseCache.clear();
+  }
+});
 
 chrome.runtime.onInstalled.addListener(async () => {
   const current = await loadSettings();
@@ -69,7 +85,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleMessage(message) {
   switch (message?.action) {
     case "get-public-settings": {
-      const settings = mergeSettings(await loadSettings());
+      const settings = mergeSettings(await loadSettingsCached());
       return {
         settings: {
           defaultTemplateId: settings.defaultTemplateId,
@@ -78,7 +94,7 @@ async function handleMessage(message) {
       };
     }
     case "set-default-template": {
-      const settings = mergeSettings(await loadSettings());
+      const settings = mergeSettings(await loadSettingsCached());
       const templateId = String(message.templateId || "");
       if (!settings.templates.some((item) => item.id === templateId)) throw new Error("模板不存在");
       settings.defaultTemplateId = templateId;
@@ -86,7 +102,7 @@ async function handleMessage(message) {
       return { defaultTemplateId: templateId };
     }
     case "enhance-text": {
-      const settings = mergeSettings(await loadSettings());
+      const settings = mergeSettings(await loadSettingsCached());
       const text = String(message.text || "").trim();
       if (!text) throw new Error("当前输入框没有可优化的内容");
       const provider = resolveProvider(settings);
@@ -97,26 +113,32 @@ async function handleMessage(message) {
         || settings.templates.find((item) => item.id === settings.defaultTemplateId)
         || settings.templates[0];
       if (!template) throw new Error("未配置优化模板");
-      const enhancedText = await callOpenAICompatible({ settings, provider, template, text });
-      return { enhancedText, templateName: template.name };
+      const result = await callOpenAICompatible({ settings, provider, template, text });
+      return {
+        enhancedText: result.text,
+        templateName: template.name,
+        elapsedMs: result.elapsedMs,
+        cached: result.cached
+      };
     }
     case "test-provider": {
       const provider = normalizeProvider(message.provider);
-      const testSettings = mergeSettings(await loadSettings());
+      const testSettings = mergeSettings(await loadSettingsCached());
       const result = await callOpenAICompatible({
         settings: testSettings,
-        provider: { ...provider, timeoutMs: Math.min(provider.timeoutMs, 30000) },
-        template: { instruction: "把下列文本原样输出，仅输出 OK。" },
-        text: "OK"
+        provider: { ...provider, timeoutMs: Math.min(provider.timeoutMs, 30000), fastMode: true, maxOutputTokens: 32 },
+        template: { id: "provider-test", instruction: "把下列文本原样输出，仅输出 OK。" },
+        text: "OK",
+        disableCache: true
       });
-      return { result };
+      return { result: result.text, elapsedMs: result.elapsedMs };
     }
     case "fetch-models": {
       const provider = normalizeProvider(message.provider);
       return { models: await fetchModels(provider) };
     }
     case "get-settings":
-      return { settings: mergeSettings(await loadSettings()) };
+      return { settings: mergeSettings(await loadSettingsCached()) };
     case "save-settings": {
       const settings = mergeSettings(message.settings || {});
       validateSettings(settings);
@@ -134,11 +156,20 @@ function resolveProvider(settings) {
   return normalizeProvider(provider);
 }
 
-async function callOpenAICompatible({ settings, provider, template, text }) {
+async function callOpenAICompatible({ settings, provider, template, text, disableCache = false }) {
   validateProvider(provider);
   const endpoint = buildEndpoint(provider.baseUrl, provider.path || "/chat/completions");
+  const cacheKey = buildResponseCacheKey(provider, template, text);
+  if (!disableCache) {
+    const cached = responseCache.get(cacheKey);
+    if (cached && Date.now() - cached.createdAt < RESPONSE_CACHE_TTL_MS) {
+      return { text: cached.text, elapsedMs: 0, cached: true };
+    }
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Number(provider.timeoutMs) || 6000);
+  const startedAt = performance.now();
 
   try {
     const headers = {
@@ -147,23 +178,28 @@ async function callOpenAICompatible({ settings, provider, template, text }) {
     };
     if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
 
+    const requestBody = {
+      model: provider.model,
+      temperature: clampNumber(provider.temperature, 0, 2, 0.3),
+      n: 1,
+      stream: false,
+      messages: [
+        {
+          role: "system",
+          content: buildSystemPrompt(settings.globalSystemPrompt, template.instruction, provider.fastMode !== false)
+        },
+        {
+          role: "user",
+          content: text
+        }
+      ]
+    };
+    applyFastGenerationLimit(requestBody, provider, text);
+
     const response = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model: provider.model,
-        temperature: clampNumber(provider.temperature, 0, 2, 0.3),
-        messages: [
-          {
-            role: "system",
-            content: `${settings.globalSystemPrompt}\n\n本次优化规则：\n${template.instruction}`
-          },
-          {
-            role: "user",
-            content: `原始输入：\n${text}`
-          }
-        ]
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal
     });
 
@@ -180,9 +216,11 @@ async function callOpenAICompatible({ settings, provider, template, text }) {
       throw new Error(`模型接口返回 ${response.status}：${String(detail).slice(0, 500)}`);
     }
 
-    const output = extractOutput(data);
+    const output = cleanOutput(extractOutput(data));
     if (!output) throw new Error("模型接口未返回可识别的文本内容");
-    return cleanOutput(output);
+    const elapsedMs = Math.max(0, Math.round(performance.now() - startedAt));
+    if (!disableCache) rememberResponse(cacheKey, output);
+    return { text: output, elapsedMs, cached: false };
   } catch (error) {
     if (error?.name === "AbortError") throw new Error("模型请求超时");
     throw error;
@@ -279,6 +317,7 @@ function validateProvider(provider, options = {}) {
   if (requireModel && !provider.model) throw new Error("模型名称不能为空");
   if (provider.timeoutMs < 1000 || provider.timeoutMs > 180000) throw new Error("请求超时必须在 1000 到 180000 毫秒之间");
   if (provider.maxInputChars < 100 || provider.maxInputChars > 100000) throw new Error("最大输入字符数必须在 100 到 100000 之间");
+  if (provider.maxOutputTokens < 32 || provider.maxOutputTokens > 16384) throw new Error("最大输出 Token 必须在 32 到 16384 之间");
   parseExtraHeaders(provider.extraHeaders);
 }
 
@@ -307,17 +346,66 @@ function normalizeProvider(provider, migration = {}) {
     temperature: clampNumber(migratedTemperature, 0, 2, 0.3),
     timeoutMs: clampNumber(provider?.timeoutMs ?? migratedTimeout, 1000, 180000, 6000),
     maxInputChars: clampNumber(provider?.maxInputChars ?? migratedMaxInput, 100, 100000, 9999),
+    fastMode: provider?.fastMode !== false,
+    maxOutputTokens: clampNumber(provider?.maxOutputTokens, 32, 16384, 1200),
     extraHeaders: typeof provider?.extraHeaders === "string"
       ? provider.extraHeaders
       : JSON.stringify(provider?.extraHeaders || {}, null, 2)
   };
 }
 
+function buildSystemPrompt(globalPrompt, instruction, fastMode) {
+  const base = `${String(globalPrompt || "").trim()}\n\n优化规则：${String(instruction || "").trim()}`.trim();
+  if (!fastMode) return base;
+  return `${base}\n要求：直接输出改写结果；保持原意；避免解释和重复；长度尽量接近原文。`;
+}
+
+function applyFastGenerationLimit(body, provider, text) {
+  if (provider.fastMode === false) return;
+  const configured = clampNumber(provider.maxOutputTokens, 32, 16384, 1200);
+  const dynamic = Math.min(configured, Math.max(192, Math.ceil(String(text || "").length * 1.35)));
+  const model = String(provider.model || "").toLowerCase();
+  if (/^(o1|o3|o4)|gpt-5/.test(model)) body.max_completion_tokens = dynamic;
+  else body.max_tokens = dynamic;
+}
+
+function buildResponseCacheKey(provider, template, text) {
+  return [
+    provider.id,
+    provider.baseUrl,
+    provider.path,
+    provider.model,
+    provider.temperature,
+    provider.fastMode,
+    provider.maxOutputTokens,
+    provider.maxInputChars,
+    provider.timeoutMs,
+    provider.extraHeaders,
+    provider.apiKey,
+    template.id,
+    template.name,
+    template.instruction,
+    text
+  ].join("\u001f");
+}
+
+function rememberResponse(key, text) {
+  responseCache.set(key, { text, createdAt: Date.now() });
+  while (responseCache.size > 20) responseCache.delete(responseCache.keys().next().value);
+}
+
+async function loadSettingsCached() {
+  if (settingsCache && Date.now() - settingsCacheAt < SETTINGS_CACHE_TTL_MS) return settingsCache;
+  settingsCache = await loadSettings();
+  settingsCacheAt = Date.now();
+  return settingsCache;
+}
+
 function mergeSettings(input = {}) {
   const merged = {
     ...DEFAULT_SETTINGS,
     ...input,
-    version: 3,
+    version: 4,
     providers: Array.isArray(input.providers) && input.providers.length
       ? input.providers.map((provider) => normalizeProvider(provider, {
           sourceVersion: Number(input.version || 1),
