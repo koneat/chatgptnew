@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Prompt Professionalizer",
-  "version": "0.6.0",
-  "description": "增加模板与系统提示词的独立保存按钮，支持模块级自定义与持久化。",
+  "version": "0.7.0",
+  "description": "增强模型接口验证与响应解析，兼容推理模型、文本数组、SSE 及多种 OpenAI 兼容返回格式。",
   "permissions": [
     "storage",
     "contextMenus",
