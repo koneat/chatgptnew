@@ -1,12 +1,11 @@
 const STORAGE_KEY = "promptProfessionalizerSettings";
 
 const DEFAULT_SETTINGS = {
-  version: 1,
+  version: 2,
   activeProviderId: "default-openai-compatible",
   defaultTemplateId: "professional",
   timeoutMs: 60000,
   maxInputChars: 30000,
-  showPreview: true,
   globalSystemPrompt: [
     "你是一名资深提示词工程师。",
     "你的任务是重写用户输入，使其意图明确、上下文充分、约束完整、输出要求可执行。",
@@ -29,34 +28,22 @@ const DEFAULT_SETTINGS = {
     {
       id: "professional",
       name: "专业化表达",
-      icon: "专",
-      instruction: "将口语化、大白话表达改写为专业、准确、无歧义的工程语言；补全必要的技术术语，但不要凭空增加事实。",
-      providerId: "",
-      model: ""
+      instruction: "将口语化、大白话表达改写为专业、准确、无歧义的工程语言；补全必要的技术术语，但不要凭空增加事实。"
     },
     {
       id: "structured",
       name: "结构化增强",
-      icon: "构",
-      instruction: "把输入整理为目标、背景、已知条件、约束、执行步骤、验收标准和期望输出格式；缺失信息使用明确的待确认项表示。",
-      providerId: "",
-      model: ""
+      instruction: "把输入整理为目标、背景、已知条件、约束、执行步骤、验收标准和期望输出格式；缺失信息使用明确的待确认项表示。"
     },
     {
       id: "security",
       name: "安全审计模式",
-      icon: "安",
-      instruction: "以企业应用安全审计语境重写，突出资产、信任边界、权限模型、数据流、攻击前提、影响、验证逻辑、修复方案和检查清单；保持防御性，不生成破坏性操作。",
-      providerId: "",
-      model: ""
+      instruction: "以企业应用安全审计语境重写，突出资产、信任边界、权限模型、数据流、攻击前提、影响、验证逻辑、修复方案和检查清单；保持防御性，不生成破坏性操作。"
     },
     {
       id: "concise",
       name: "精简去歧义",
-      icon: "简",
-      instruction: "删除重复和情绪化表述，保留关键目标、约束和验收条件，用尽可能少但足够明确的文字表达。",
-      providerId: "",
-      model: ""
+      instruction: "删除重复和情绪化表述，保留关键目标、约束和验收条件，用尽可能少但足够明确的文字表达。"
     }
   ]
 };
@@ -68,7 +55,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: "prompt-professionalizer-enhance",
-      title: "优化当前 AI 输入框",
+      title: "优化并替换当前 AI 输入框",
       contexts: ["page", "editable"]
     });
   });
@@ -101,10 +88,17 @@ async function handleMessage(message) {
       return {
         settings: {
           defaultTemplateId: settings.defaultTemplateId,
-          showPreview: settings.showPreview,
-          templates: settings.templates.map(({ id, name, icon }) => ({ id, name, icon }))
+          templates: settings.templates.map(({ id, name }) => ({ id, name }))
         }
       };
+    }
+    case "set-default-template": {
+      const settings = mergeSettings(await loadSettings());
+      const templateId = String(message.templateId || "");
+      if (!settings.templates.some((item) => item.id === templateId)) throw new Error("模板不存在");
+      settings.defaultTemplateId = templateId;
+      await saveSettings(settings);
+      return { defaultTemplateId: templateId };
     }
     case "enhance-text": {
       const settings = mergeSettings(await loadSettings());
@@ -117,7 +111,7 @@ async function handleMessage(message) {
         || settings.templates.find((item) => item.id === settings.defaultTemplateId)
         || settings.templates[0];
       if (!template) throw new Error("未配置优化模板");
-      const provider = resolveProvider(settings, template);
+      const provider = resolveProvider(settings);
       const enhancedText = await callOpenAICompatible({ settings, provider, template, text });
       return { enhancedText, templateName: template.name };
     }
@@ -149,11 +143,10 @@ async function handleMessage(message) {
   }
 }
 
-function resolveProvider(settings, template) {
-  const providerId = template.providerId || settings.activeProviderId;
-  const provider = settings.providers.find((item) => item.id === providerId) || settings.providers[0];
+function resolveProvider(settings) {
+  const provider = settings.providers.find((item) => item.id === settings.activeProviderId) || settings.providers[0];
   if (!provider) throw new Error("未配置模型接口");
-  return normalizeProvider({ ...provider, model: template.model || provider.model });
+  return normalizeProvider(provider);
 }
 
 async function callOpenAICompatible({ settings, provider, template, text }) {
@@ -321,6 +314,7 @@ function mergeSettings(input = {}) {
   const merged = {
     ...DEFAULT_SETTINGS,
     ...input,
+    version: 2,
     providers: Array.isArray(input.providers) && input.providers.length
       ? input.providers.map(normalizeProvider)
       : DEFAULT_SETTINGS.providers.map(normalizeProvider),
@@ -328,13 +322,11 @@ function mergeSettings(input = {}) {
       ? input.templates.map((template) => ({
           id: String(template.id || crypto.randomUUID()),
           name: String(template.name || "未命名模板"),
-          icon: String(template.icon || "优").slice(0, 2),
-          instruction: String(template.instruction || "优化输入内容。"),
-          providerId: String(template.providerId || ""),
-          model: String(template.model || "")
+          instruction: String(template.instruction || "优化输入内容。")
         }))
       : structuredClone(DEFAULT_SETTINGS.templates)
   };
+
   if (!merged.providers.some((item) => item.id === merged.activeProviderId)) {
     merged.activeProviderId = merged.providers[0]?.id || "";
   }
@@ -343,7 +335,7 @@ function mergeSettings(input = {}) {
   }
   merged.timeoutMs = clampNumber(merged.timeoutMs, 5000, 180000, 60000);
   merged.maxInputChars = clampNumber(merged.maxInputChars, 100, 100000, 30000);
-  merged.showPreview = merged.showPreview !== false;
+  delete merged.showPreview;
   return merged;
 }
 
