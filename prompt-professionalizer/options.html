@@ -77,21 +77,25 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
 
     <section class="card">
       <div class="section-head">
-        <div><h2>优化模板</h2><p>侧边菜单选择一次后会立即保存为默认模式，后续单击按钮持续使用该模板。</p></div>
-        <button id="add-template">新增模板</button>
+        <div><h2>优化模板</h2><p>模板名称和优化规则均可自定义；选择默认模板或点击保存后会持久化到本机扩展存储。</p></div>
+        <div class="actions"><button id="add-template">新增模板</button><button id="save-templates" class="primary">保存模板</button></div>
       </div>
       <label>默认模板<select id="default-template"></select></label>
       <div id="template-list" class="template-list"></div>
     </section>
 
     <section class="card">
-      <h2>全局提示词规则</h2>
-      <label>系统提示词<textarea id="global-system-prompt" rows="7"></textarea></label>
+      <div class="section-head">
+        <div><h2>全局提示词规则</h2><p>系统提示词可完全自定义，并作为所有优化模板共同使用的基础规则。</p></div>
+        <button id="save-global-prompt" class="primary">保存系统提示词</button>
+      </div>
+      <label>系统提示词<textarea id="global-system-prompt" rows="7" placeholder="输入所有模板共同遵循的系统规则"></textarea></label>
     </section>
 
     <div id="save-status" class="save-status" role="status"></div>
   </main>
   <script src="options-status.js"></script>
   <script src="options.js"></script>
+  <script src="options-module-save.js"></script>
 </body>
 </html>
