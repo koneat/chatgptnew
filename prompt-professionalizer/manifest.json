@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Prompt Professionalizer",
-  "version": "0.5.0",
-  "description": "修复拖动后输入闪烁，并通过快速模式、输出限制和结果缓存降低模型等待。",
+  "version": "0.6.0",
+  "description": "增加模板与系统提示词的独立保存按钮，支持模块级自定义与持久化。",
   "permissions": [
     "storage",
     "contextMenus",
