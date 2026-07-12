@@ -61,12 +61,18 @@ function renderProviderForm() {
   $("#provider-timeout-ms").value = provider.timeoutMs ?? 6000;
   $("#provider-max-input-chars").value = provider.maxInputChars ?? 9999;
   $("#provider-headers").value = provider.extraHeaders || "{}";
-  $("#provider-status").textContent = "";
+  if (provider.health?.ok) {
+    const checkedAt = provider.health.checkedAt ? new Date(provider.health.checkedAt).toLocaleString() : "";
+    setProviderStatus(`模型已验证可用${checkedAt ? `（${checkedAt}）` : ""}`);
+  } else {
+    setProviderStatus(provider.health?.error || "模型尚未验证；验证成功后输入框 P 才会变绿", true);
+  }
 }
 
 function persistProviderForm() {
   const provider = currentProvider();
   if (!provider) return;
+  const before = providerConfigSnapshot(provider);
   provider.name = $("#provider-name").value.trim() || "未命名模型";
   provider.model = $("#provider-model").value.trim();
   provider.baseUrl = $("#provider-base-url").value.trim();
@@ -76,6 +82,7 @@ function persistProviderForm() {
   provider.timeoutMs = Number($("#provider-timeout-ms").value || 6000);
   provider.maxInputChars = Number($("#provider-max-input-chars").value || 9999);
   provider.extraHeaders = $("#provider-headers").value.trim() || "{}";
+  if (before !== providerConfigSnapshot(provider)) delete provider.health;
 }
 
 function addProvider() {
@@ -91,7 +98,8 @@ function addProvider() {
     temperature: 0.3,
     timeoutMs: 6000,
     maxInputChars: 9999,
-    extraHeaders: "{}"
+    extraHeaders: "{}",
+    health: { ok: false, checkedAt: 0, signature: "", error: "模型尚未验证" }
   });
   activeProviderId = id;
   settings.activeProviderId = id;
@@ -184,7 +192,10 @@ async function testProvider() {
     setProviderStatus("正在验证接口…");
     const response = await chrome.runtime.sendMessage({ action: "test-provider", provider });
     if (!response?.ok) throw new Error(response?.error || "验证失败");
-    setProviderStatus(`接口可用，返回：${String(response.result).slice(0, 80)}`);
+    provider.health = response.health;
+    await saveSettingsOnly();
+    if (!response.passed) throw new Error(response.error || "验证失败");
+    setProviderStatus(`模型可用，返回：${String(response.result).slice(0, 80)}`);
   } catch (error) {
     setProviderStatus(error.message, true);
   }
@@ -193,18 +204,22 @@ async function testProvider() {
 async function saveAll() {
   try {
     persistProviderForm();
-    settings.activeProviderId = activeProviderId;
-    settings.defaultTemplateId = $("#default-template").value;
-    settings.globalSystemPrompt = $("#global-system-prompt").value.trim();
-    for (const card of document.querySelectorAll(".template-card")) persistTemplateCard(card);
     await ensureOriginPermission(currentProvider().baseUrl);
-    const response = await chrome.runtime.sendMessage({ action: "save-settings", settings });
-    if (!response?.ok) throw new Error(response?.error || "保存失败");
-    settings = response.settings;
+    await saveSettingsOnly();
     toast("设置已保存");
   } catch (error) {
     toast(error.message, true);
   }
+}
+
+async function saveSettingsOnly() {
+  settings.activeProviderId = activeProviderId;
+  settings.defaultTemplateId = $("#default-template").value;
+  settings.globalSystemPrompt = $("#global-system-prompt").value.trim();
+  for (const card of document.querySelectorAll(".template-card")) persistTemplateCard(card);
+  const response = await chrome.runtime.sendMessage({ action: "save-settings", settings });
+  if (!response?.ok) throw new Error(response?.error || "保存失败");
+  settings = response.settings;
 }
 
 async function ensureOriginPermission(baseUrl) {
@@ -221,6 +236,19 @@ function toggleApiKey() {
   const input = $("#provider-api-key");
   input.type = input.type === "password" ? "text" : "password";
   $("#toggle-key").textContent = input.type === "password" ? "显示" : "隐藏";
+}
+
+function providerConfigSnapshot(provider) {
+  return JSON.stringify({
+    baseUrl: provider?.baseUrl || "",
+    path: provider?.path || "",
+    apiKey: provider?.apiKey || "",
+    model: provider?.model || "",
+    temperature: Number(provider?.temperature ?? 0.3),
+    timeoutMs: Number(provider?.timeoutMs ?? 6000),
+    maxInputChars: Number(provider?.maxInputChars ?? 9999),
+    extraHeaders: provider?.extraHeaders || "{}"
+  });
 }
 
 function currentProvider() {
