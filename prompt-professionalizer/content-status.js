@@ -22,6 +22,7 @@
     state.button = state.root.querySelector(".main");
     state.menu = state.root.querySelector(".menu");
     state.position = await loadPosition();
+    setCustomPositionMode(Boolean(state.position));
     installDrag();
     installResetItem();
     observeToasts();
@@ -33,13 +34,17 @@
       if (changes[SETTINGS_KEY] || changes[HEALTH_KEY]) await refreshColor();
       if (changes[POSITION_KEY]) {
         state.position = readPosition(changes[POSITION_KEY].newValue || {});
-        applyPosition();
+        setCustomPositionMode(Boolean(state.position));
+        if (state.position) applyPosition();
       }
     });
 
-    window.addEventListener("scroll", () => requestAnimationFrame(applyPosition), true);
-    window.addEventListener("resize", () => requestAnimationFrame(applyPosition), true);
-    new MutationObserver(() => requestAnimationFrame(applyPosition)).observe(state.host, { attributes: true, attributeFilter: ["style"] });
+    window.addEventListener("scroll", () => {
+      if (state.position) requestAnimationFrame(applyPosition);
+    }, true);
+    window.addEventListener("resize", () => {
+      if (state.position) requestAnimationFrame(applyPosition);
+    }, true);
   }
 
   function installDrag() {
@@ -55,6 +60,7 @@
         moved: false
       };
       state.button.setPointerCapture?.(event.pointerId);
+      state.host.dataset.pDragging = "true";
     });
 
     state.button.addEventListener("pointermove", (event) => {
@@ -75,6 +81,7 @@
       const drag = state.drag;
       if (!drag || drag.pointerId !== event.pointerId) return;
       state.drag = null;
+      delete state.host.dataset.pDragging;
       try { state.button.releasePointerCapture?.(event.pointerId); } catch {}
       if (!drag.moved) return;
       state.suppressUntil = Date.now() + 350;
@@ -103,6 +110,11 @@
       const map = result[POSITION_KEY] || {};
       delete map[location.hostname];
       state.position = null;
+      setCustomPositionMode(false);
+      state.host.style.left = "";
+      state.host.style.top = "";
+      state.host.style.right = "";
+      state.host.style.bottom = "";
       await chrome.storage.local.set({ [POSITION_KEY]: map });
       state.menu.classList.remove("open");
       window.dispatchEvent(new Event("resize"));
@@ -165,6 +177,8 @@
       String(Number(provider?.temperature ?? 0.3)),
       String(Number(provider?.timeoutMs ?? 6000)),
       String(Number(provider?.maxInputChars ?? 9999)),
+      String(provider?.fastMode !== false),
+      String(Number(provider?.maxOutputTokens ?? 1200)),
       String(provider?.extraHeaders || "{}"),
       fingerprint(provider?.apiKey)
     ].join("\u001f");
@@ -197,8 +211,15 @@
     };
   }
 
+  function setCustomPositionMode(enabled) {
+    if (!state.host) return;
+    if (enabled) state.host.dataset.pCustomPosition = "true";
+    else delete state.host.dataset.pCustomPosition;
+  }
+
   function applyPosition() {
     if (!state.position || !state.host) return;
+    setCustomPositionMode(true);
     const left = clamp(state.position.x * (window.innerWidth - BUTTON_SIZE), 4, window.innerWidth - BUTTON_SIZE - 4);
     const top = clamp(state.position.y * (window.innerHeight - BUTTON_SIZE), 4, window.innerHeight - BUTTON_SIZE - 4);
     if (state.host.style.left !== `${left}px`) state.host.style.left = `${left}px`;
