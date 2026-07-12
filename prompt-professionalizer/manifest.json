@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Prompt Professionalizer",
-  "version": "0.7.0",
-  "description": "增强模型接口验证与响应解析，兼容推理模型、文本数组、SSE 及多种 OpenAI 兼容返回格式。",
+  "version": "0.8.0",
+  "description": "默认使用 OpenRouter Free，并以低延迟路由、故障回退和瞬时错误重试兼顾速度与稳定性。",
   "permissions": [
     "storage",
     "contextMenus",
