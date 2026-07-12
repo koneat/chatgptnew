@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Prompt Professionalizer",
-  "version": "0.8.0",
-  "description": "默认使用 OpenRouter Free，并以低延迟路由、故障回退和瞬时错误重试兼顾速度与稳定性。",
+  "version": "0.9.0",
+  "description": "强制中文输出并逐字保留所有 @ 标识，不合格结果自动重试且不会覆盖输入框。",
   "permissions": [
     "storage",
     "contextMenus",
