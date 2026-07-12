@@ -33,6 +33,8 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
 .template-card { display:grid; grid-template-columns:minmax(180px,260px) 1fr auto; gap:10px; align-items:end; padding:14px; border:1px solid #2b3a50; border-radius:12px; background:#0b1220; }
 .template-card .instruction { grid-column:1 / -2; }
 .template-card .delete { align-self:stretch; }
+.checkbox { flex-direction:row; align-items:center; justify-content:flex-start; padding-top:24px; }
+.checkbox input { width:auto; }
 .status { color:#93c5fd; font-size:13px; }
 .save-status { position:fixed; right:22px; bottom:22px; min-width:180px; max-width:360px; padding:11px 14px; border-radius:10px; background:#14532d; color:#fff; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; }
 .save-status.show { opacity:1; transform:none; }
@@ -66,6 +68,8 @@ button.danger { border-color:#7f1d1d; color:#fecaca; }
         <label>Temperature<input id="provider-temperature" type="number" min="0" max="2" step="0.1"></label>
         <label>请求超时（毫秒）<input id="provider-timeout-ms" type="number" min="1000" max="180000" step="1000"></label>
         <label>最大输入字符数<input id="provider-max-input-chars" type="number" min="100" max="100000" step="100"></label>
+        <label>最大输出 Token<input id="provider-max-output-tokens" type="number" min="32" max="16384" step="32"></label>
+        <label class="checkbox"><input id="provider-fast-mode" type="checkbox">快速模式（限制输出长度，减少等待）</label>
         <label>附加请求头 JSON<input id="provider-headers" placeholder='{"HTTP-Referer":"https://example.com"}'></label>
       </div>
       <div class="actions footer-actions"><button id="fetch-models">拉取模型列表</button><button id="test-provider">验证接口</button><span id="provider-status" class="status"></span></div>
