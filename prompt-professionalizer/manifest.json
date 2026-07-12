@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Prompt Professionalizer",
-  "version": "0.1.0",
-  "description": "在 AI 对话框中一键扩写、结构化并专业化提示词，支持自定义 OpenAI 兼容模型。",
+  "version": "0.2.0",
+  "description": "在 AI 对话框侧边单击即可专业化并替换提示词，支持自定义 OpenAI 兼容模型与持久化模板。",
   "permissions": [
     "storage",
     "contextMenus"
@@ -22,7 +22,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Prompt Professionalizer（点击打开设置）"
+    "default_title": "Prompt Professionalizer 设置"
   },
   "content_scripts": [
     {
@@ -49,7 +49,7 @@
         "default": "Ctrl+Shift+M",
         "mac": "Command+Shift+M"
       },
-      "description": "优化当前输入框中的提示词"
+      "description": "优化并替换当前输入框中的提示词"
     }
   },
   "optional_host_permissions": [
